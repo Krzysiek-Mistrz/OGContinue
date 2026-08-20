@@ -4,7 +4,7 @@
 
 ## Checklist
 
-- [] I've read the [contributing guide](https://github.com/continuedev/continue/blob/main/CONTRIBUTING.md)
+- [] I've read the [contributing guide](https://github.com/Krzysiek-Mistrz/OGContinue/blob/main/CONTRIBUTING.md)
 - [] The relevant docs, if any, have been updated or created
 - [] The relevant tests, if any, have been updated or created
 

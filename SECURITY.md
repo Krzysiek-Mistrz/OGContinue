@@ -2,15 +2,19 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please do not open a public issue. Instead, please report it by emailing security@continue.dev. We will be highly responsive to all security concerns and ask that you give us sufficient time to investigate and address the vulnerability before disclosing it publicly.
+If you discover a security vulnerability, please do not open a public issue. Instead, use GitHub's private vulnerability reporting: go to the [Security tab](https://github.com/Krzysiek-Mistrz/OGContinue/security) of this repository and select "Report a vulnerability". This opens a private draft security advisory visible only to you and the maintainer, and keeps the issue out of public view until a fix is ready.
 
-Please include the following details in your report:
+Please include:
 
 - A description of the vulnerability
 - Steps to reproduce the issue
 - Your assessment of the potential impact
-- Any possible mitigations
+- Any possible mitigations you're aware of
 
-## Contact
+## What to expect
 
-For any other questions or concerns related to security, please contact us at security@continue.dev.
+This is a community-maintained fork with a single maintainer, not a project with a dedicated security team. There is no guaranteed response time — reports are handled on a best-effort basis. You will get an acknowledgment as soon as the report is seen, and a fix will be prioritized based on severity.
+
+## Supported versions
+
+Only the latest version of the VS Code extension on the `main` branch receives security fixes. There is no long-term support for older releases.

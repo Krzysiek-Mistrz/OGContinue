@@ -27,27 +27,19 @@
 
 ## Chat
 
-[Chat](https://continue.dev/docs/chat/how-to-use-it) makes it easy to ask for help from an LLM without needing to leave the IDE
-
-![chat](docs/static/img/chat.gif)
+Chat makes it easy to ask for help from an LLM without needing to leave the IDE.
 
 ## Autocomplete
 
-[Autocomplete](https://continue.dev/docs/autocomplete/how-to-use-it) provides inline code suggestions as you type
-
-![autocomplete](docs/static/img/autocomplete.gif)
+Autocomplete provides inline code suggestions as you type.
 
 ## Edit
 
-[Edit](https://continue.dev/docs/edit/how-to-use-it) is a convenient way to modify code without leaving your current file
-
-![edit](docs/static/img/edit.gif)
+Edit is a convenient way to modify code without leaving your current file.
 
 ## Agent
 
-[Agent](https://continue.dev/docs/agent/how-to-use-it) enables you to make more substantial changes to your codebase
-
-![agent](docs/static/img/agent.gif)
+Agent enables you to make more substantial changes to your codebase.
 
 </div>
 

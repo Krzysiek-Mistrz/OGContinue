@@ -1,5 +1,5 @@
 ---
-name: 📖 Documentation Issue Report
+name: Documentation Issue Report
 description: Report issues related to the documentation
 labels: [area:docs]
 
@@ -11,8 +11,8 @@ body:
         We appreciate your feedback. Before submitting, please check if a similar issue already exists.
 
         ### Quick Contribution Tips:
-        - Click "Edit this page" at the bottom of any page on [docs.continue.dev](https://docs.continue.dev) to contribute directly.
-        - For local development, see [CONTRIBUTING.md](https://github.com/continuedev/continue/blob/main/CONTRIBUTING.md#-updating--improving-documentation).
+        - Documentation lives as plain Markdown files in this repo (README.md, CHANGES.md, docs/) — feel free to open a PR editing the file directly.
+        - See [CONTRIBUTING.md](https://github.com/Krzysiek-Mistrz/OGContinue/blob/main/CONTRIBUTING.md#updating-documentation).
 
   - type: dropdown
     id: doc-issue-category
@@ -32,9 +32,9 @@ body:
   - type: input
     id: page-url
     attributes:
-      label: Affected Documentation Page URL
-      description: Provide the URL of the specific page where you encountered the issue.
-      placeholder: "https://docs.continue.dev/path/to/page"
+      label: Affected File
+      description: Provide the path to the file where you encountered the issue (e.g. README.md, docs/LOCAL_SETUP.md).
+      placeholder: "docs/LOCAL_SETUP.md"
     validations:
       required: false
 

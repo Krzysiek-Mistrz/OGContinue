@@ -28,7 +28,6 @@
     "core/llm/llamaTokenizer.mjs": true,
     "core/vendor/**": true,
     "docs/.docusaurus/**": true,
-    "extensions/intellij/build/**": true,
     "extensions/vscode/bin/**": true,
     "extensions/vscode/build/**": true,
     "extensions/vscode/gui/**": true,

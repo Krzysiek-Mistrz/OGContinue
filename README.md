@@ -11,6 +11,8 @@
 > Distributed under the same [Apache 2.0](./LICENSE) license as the original project. See [CHANGES.md](./CHANGES.md) for a summary of what's different from upstream.
 >
 > "Continue" and the Continue logo are trademarks of Continue Dev, Inc. This is an independent, unofficial fork; no trademark rights are claimed or implied.
+>
+> **Platform focus:** OGContinue targets **VS Code only**. The JetBrains/IntelliJ and CLI variants inherited from upstream have been removed from this repo — all effort goes into making the VS Code extension work well.
 
 <div align="center">
 

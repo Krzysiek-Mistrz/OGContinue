@@ -4,24 +4,25 @@
 
 </div>
 
-<h1 align="center">Continue</h1>
+<h1 align="center">OGContinue</h1>
 
 <div align="center">
 
-**[Continue](https://docs.continue.dev) enables developers to create, share, and use custom AI code assistants with our open-source [VS Code](https://marketplace.visualstudio.com/items?itemName=Continue.continue) and [JetBrains](https://plugins.jetbrains.com/plugin/22707-continue-extension) extensions and [hub of models, rules, prompts, docs, and other building blocks](https://hub.continue.dev)**
+**OGContinue is a community-maintained fork of [Continue](https://docs.continue.dev) (based on the `v1.0.10-vscode` tag), focused on running fully locally with local models — no cloud, no accounts, no telemetry required. It is not affiliated with or endorsed by Continue Dev, Inc.**
 
 </div>
+
+> **About this fork**
+> OGContinue was created because upstream Continue development had slowed down while this snapshot of the project still worked well and had few outstanding bugs. This fork exists to keep it alive, fix issues, and add functionality (working Agent mode, in-file Keep/Undo for edits, and better defaults for local-model workflows) for people who want a genuinely local AI coding assistant.
+> Distributed under the same [Apache 2.0](./LICENSE) license as the original project. See [CHANGES.md](./CHANGES.md) for a summary of what's different from upstream.
 
 <div align="center">
 
 <a target="_blank" href="https://opensource.org/licenses/Apache-2.0" style="background:none">
     <img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" style="height: 22px;" />
 </a>
-<a target="_blank" href="https://docs.continue.dev" style="background:none">
-    <img src="https://img.shields.io/badge/continue_docs-%23BE1B55" style="height: 22px;" />
-</a>
-<a target="_blank" href="https://discord.gg/vapESyrFmJ" style="background:none">
-    <img src="https://img.shields.io/badge/discord-join-continue.svg?labelColor=191937&color=6F6FF7&logo=discord" style="height: 22px;" />
+<a target="_blank" href="https://github.com/Krzysiek-Mistrz/OGContinue" style="background:none">
+    <img src="https://img.shields.io/badge/fork_of-continuedev%2Fcontinue-%23BE1B55" style="height: 22px;" />
 </a>
 
 <p></p>
@@ -54,12 +55,12 @@
 
 ## Getting Started
 
-Learn about how to install and use Continue in the docs [here](https://continue.dev/docs/getting-started/install)
+OGContinue is built from the upstream Continue codebase, so most general usage docs at [continue.dev/docs](https://continue.dev/docs) still apply. For local-only setup (recommended Ollama models, RAG config, Agent mode), see [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) in this repo.
 
 ## Contributing
 
-Read the [contributing guide](https://github.com/continuedev/continue/blob/main/CONTRIBUTING.md), and join [#contribute on Discord](https://discord.gg/vapESyrFmJ).
+This is a small community fork — issues and PRs are welcome on [this repository](https://github.com/Krzysiek-Mistrz/OGContinue). For contributing to upstream Continue itself, see the [original project](https://github.com/continuedev/continue).
 
 ## License
 
-[Apache 2.0 © 2023-2024 Continue Dev, Inc.](./LICENSE)
+Apache 2.0. Original work © 2023-2024 Continue Dev, Inc. Modifications © 2026 Krzysiek-Mistrz. See [LICENSE](./LICENSE) and [CHANGES.md](./CHANGES.md).

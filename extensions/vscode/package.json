@@ -1,27 +1,26 @@
 {
-  "name": "continue",
+  "name": "ogcontinue",
   "icon": "media/icon.png",
-  "author": "Continue Dev, Inc",
+  "author": "Krzysiek-Mistrz",
   "version": "1.0.10",
   "repository": {
     "type": "git",
-    "url": "https://github.com/continuedev/continue"
+    "url": "https://github.com/Krzysiek-Mistrz/OGContinue"
   },
   "extensionKind": [
     "ui",
     "workspace"
   ],
   "bugs": {
-    "url": "https://github.com/continuedev/continue/issues",
-    "email": "nate@continue.dev"
+    "url": "https://github.com/Krzysiek-Mistrz/OGContinue/issues"
   },
-  "homepage": "https://continue.dev",
-  "qna": "https://github.com/continuedev/continue/issues/new/choose",
+  "homepage": "https://github.com/Krzysiek-Mistrz/OGContinue",
+  "qna": "https://github.com/Krzysiek-Mistrz/OGContinue/issues/new/choose",
   "license": "Apache-2.0",
-  "displayName": "Continue - Codestral, Claude, and more",
+  "displayName": "OGContinue - Local AI Code Assistant",
   "pricing": "Free",
-  "description": "The leading open-source AI code assistant",
-  "publisher": "Continue",
+  "description": "Community fork of Continue focused on fully local AI coding assistance. Unofficial, not affiliated with Continue Dev, Inc.",
+  "publisher": "Krzysiek-Mistrz",
   "engines": {
     "vscode": "^1.70.0",
     "node": ">=20.19.0"

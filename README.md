@@ -1,9 +1,3 @@
-<div align="center">
-
-![Continue logo](media/readme.png)
-
-</div>
-
 <h1 align="center">OGContinue</h1>
 
 <div align="center">
@@ -15,6 +9,8 @@
 > **About this fork**
 > OGContinue was created because upstream Continue development had slowed down while this snapshot of the project still worked well and had few outstanding bugs. This fork exists to keep it alive, fix issues, and add functionality (working Agent mode, in-file Keep/Undo for edits, and better defaults for local-model workflows) for people who want a genuinely local AI coding assistant.
 > Distributed under the same [Apache 2.0](./LICENSE) license as the original project. See [CHANGES.md](./CHANGES.md) for a summary of what's different from upstream.
+>
+> "Continue" and the Continue logo are trademarks of Continue Dev, Inc. This is an independent, unofficial fork; no trademark rights are claimed or implied.
 
 <div align="center">
 

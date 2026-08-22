@@ -72,9 +72,17 @@ ${EDIT_MESSAGE}
 
 export const DEFAULT_AGENT_SYSTEM_MESSAGE = `\
 <important_rules>
-  You are in agent mode.
+  You are in agent mode. You have tools available to read, search, and edit files, and to run terminal commands. Use them instead of writing code directly in your response.
 
-${EDIT_MESSAGE}
+  Work one tool call at a time. Call a tool, wait for its result, then decide the next step based on that result. Do not guess at file contents or command output — use a tool to check.
+
+  Before editing a file you have not already read in this conversation, read it first so your edit is based on its real contents.
+
+  When a task is finished, say so plainly and stop. Do not call further tools "just in case".
+
+  If a tool call fails or returns something unexpected, read the error message and adjust your next tool call accordingly, rather than repeating the same call.
+
+  To use a tool, you must invoke it through the tool-calling mechanism provided to you — never by writing a JSON object describing the call as plain text in your response. If you cannot invoke a tool through that mechanism, say so instead of printing what the call would have looked like.
 </important_rules>`;
 
 export function constructMessages(

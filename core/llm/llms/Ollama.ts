@@ -14,6 +14,88 @@ import { getRemoteModelInfo } from "../../util/ollamaHelper.js";
 import { BaseLLM } from "../index.js";
 import { streamResponse } from "../stream.js";
 
+/**
+ * Small/quantized models sometimes fail to trigger Ollama's native tool-call
+ * parsing (which depends on the model's own chat template recognizing a
+ * specific token sequence) and instead just print a tool-call-shaped JSON
+ * object as ordinary text. This scans a message's text content for a
+ * balanced `{ ... }` object whose "name" matches one of the tools we
+ * actually offered, so we can still recover and execute the call instead of
+ * silently showing raw JSON in the chat.
+ *
+ * Returns the recovered call plus the surrounding text with the JSON
+ * stripped out, or null if nothing matching was found.
+ */
+function tryRecoverToolCallFromText(
+  content: string,
+  validToolNames: string[],
+): { name: string; args: unknown; remainingText: string } | null {
+  if (validToolNames.length === 0) {
+    return null;
+  }
+
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] !== "{") {
+      continue;
+    }
+
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+
+    for (let j = i; j < content.length; j++) {
+      const ch = content[j];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (ch === "\\") {
+          escaped = true;
+        } else if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+      } else if (ch === "{") {
+        depth++;
+      } else if (ch === "}") {
+        depth--;
+        if (depth === 0) {
+          end = j;
+          break;
+        }
+      }
+    }
+
+    if (end === -1) {
+      continue;
+    }
+
+    const candidate = content.slice(i, end + 1);
+    try {
+      const parsed = JSON.parse(candidate);
+      if (
+        parsed &&
+        typeof parsed.name === "string" &&
+        validToolNames.includes(parsed.name) &&
+        typeof parsed.arguments === "object" &&
+        parsed.arguments !== null
+      ) {
+        const remainingText = (
+          content.slice(0, i) + content.slice(end + 1)
+        ).trim();
+        return { name: parsed.name, args: parsed.arguments, remainingText };
+      }
+    } catch {
+      // Not valid JSON at this position — keep scanning.
+    }
+  }
+
+  return null;
+}
+
 type OllamaChatMessage = {
   role: ChatMessageRole;
   content: string;
@@ -395,8 +477,7 @@ class Ollama extends BaseLLM implements ModelInstaller {
       stream: options.stream,
       // format: options.format, // Not currently in base completion options
     };
-    // This logic is because tools can ONLY be included with user message for ollama
-    if (options.tools?.length && ollamaMessages.at(-1)?.role === "user") {
+    if (options.tools?.length) {
       chatOptions.tools = options.tools.map((tool) => ({
         type: "function",
         function: {
@@ -446,6 +527,28 @@ class Ollama extends BaseLLM implements ModelInstaller {
               arguments: JSON.stringify(tc.function.arguments),
             },
           }));
+        } else if (options.tools?.length) {
+          // Some models (especially smaller/quantized ones) fail to trigger
+          // Ollama's own template-based tool-call parsing and instead print
+          // the call as plain JSON text. Try to recover it rather than just
+          // showing raw JSON in the chat.
+          const recovered = tryRecoverToolCallFromText(
+            res.message.content,
+            options.tools.map((tool) => tool.function.name),
+          );
+          if (recovered) {
+            chatMessage.content = recovered.remainingText;
+            chatMessage.toolCalls = [
+              {
+                type: "function",
+                id: `tc_${uuidv4()}`,
+                function: {
+                  name: recovered.name,
+                  arguments: JSON.stringify(recovered.args),
+                },
+              },
+            ];
+          }
         }
         return chatMessage;
       } else {

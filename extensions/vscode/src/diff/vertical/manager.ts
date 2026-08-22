@@ -178,7 +178,7 @@ export class VerticalDiffManager {
     );
 
     if (blocks.length === 1) {
-      this.clearForfileUri(fileUri, true);
+      this.clearForfileUri(fileUri, accept);
     } else {
       // Re-enable listener for user changes to file
       this.enableDocumentChangeListener();

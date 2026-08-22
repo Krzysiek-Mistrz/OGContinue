@@ -422,7 +422,11 @@ export class VerticalDiffHandler implements vscode.Disposable {
           }
           return x;
         }) || [];
-    this.editorToVerticalDiffCodeLens.set(this.fileUri, blocks);
+    if (blocks.length === 0) {
+      this.editorToVerticalDiffCodeLens.delete(this.fileUri);
+    } else {
+      this.editorToVerticalDiffCodeLens.set(this.fileUri, blocks);
+    }
 
     this.refreshCodeLens();
   }

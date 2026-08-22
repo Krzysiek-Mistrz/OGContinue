@@ -21,8 +21,19 @@ export function getNonce() {
   return text;
 }
 
+let cachedExtensionUri: vscode.Uri | undefined;
+
+export function setExtensionUri(uri: vscode.Uri) {
+  cachedExtensionUri = uri;
+}
+
 export function getExtensionUri(): vscode.Uri {
-  return vscode.extensions.getExtension("Continue.continue")!.extensionUri;
+  if (!cachedExtensionUri) {
+    throw new Error(
+      "getExtensionUri() called before the extension finished activating",
+    );
+  }
+  return cachedExtensionUri;
 }
 
 export function getViewColumnOfFile(

@@ -6,11 +6,14 @@ import * as path from "path";
 import { VsCodeExtension } from "../extension/VsCodeExtension";
 import registerQuickFixProvider from "../lang-server/codeActions";
 import { getExtensionVersion } from "../util/util";
+import { setExtensionUri } from "../util/vscode";
 
 import { VsCodeContinueApi } from "./api";
 import setupInlineTips from "./InlineTipManager";
 
 export async function activateExtension(context: vscode.ExtensionContext) {
+  setExtensionUri(context.extensionUri);
+
   // Add necessary files
   getTsConfigPath();
   getContinueRcPath();

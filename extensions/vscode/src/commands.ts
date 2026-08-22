@@ -37,7 +37,7 @@ import { ContinueConsoleWebviewViewProvider } from "./ContinueConsoleWebviewView
 import { ContinueGUIWebviewViewProvider } from "./ContinueGUIWebviewViewProvider";
 import { VerticalDiffManager } from "./diff/vertical/manager";
 import EditDecorationManager from "./quickEdit/EditDecorationManager";
-import { QuickEdit, QuickEditShowParams } from "./quickEdit/QuickEditQuickPick";
+import { QuickEditShowParams } from "./quickEdit/QuickEditShowParams";
 import {
   addCodeToContextFromRange,
   addEntireFileToContext,
@@ -171,7 +171,6 @@ const getCommandsMap: (
   verticalDiffManager: VerticalDiffManager,
   continueServerClientPromise: Promise<ContinueServerClient>,
   battery: Battery,
-  quickEdit: QuickEdit,
   core: Core,
   editDecorationManager: EditDecorationManager,
 ) => { [command: string]: (...args: any) => any } = (
@@ -183,7 +182,6 @@ const getCommandsMap: (
   verticalDiffManager,
   continueServerClientPromise,
   battery,
-  quickEdit,
   core,
   editDecorationManager,
 ) => {
@@ -329,25 +327,28 @@ const getCommandsMap: (
         false,
       );
 
-      if (isContinueInputFocused) {
-        if (historyLength === 0) {
-          hideGUI();
-        } else {
-          void sidebar.webviewProtocol?.request(
-            "focusContinueInputWithNewSession",
-            undefined,
-            false,
-          );
-        }
+      if (isContinueInputFocused && historyLength === 0) {
+        hideGUI();
+        return;
+      }
+
+      focusGUI();
+      if (historyLength > 0) {
+        // A chat is already open with an active conversation: add the
+        // highlighted code to it instead of silently discarding that
+        // conversation and starting a new one.
+        void sidebar.webviewProtocol?.request(
+          "focusContinueInputWithoutClear",
+          undefined,
+        );
       } else {
-        focusGUI();
-        sidebar.webviewProtocol?.request(
+        void sidebar.webviewProtocol?.request(
           "focusContinueInputWithNewSession",
           undefined,
           false,
         );
-        void addHighlightedCodeToContext(sidebar.webviewProtocol);
       }
+      void addHighlightedCodeToContext(sidebar.webviewProtocol);
     },
     "continue.focusContinueInputWithoutClear": async () => {
       const isContinueInputFocused = await sidebar.webviewProtocol.request(
@@ -729,7 +730,7 @@ const getCommandsMap: (
       const feedback = await vscode.window.showInputBox({
         ignoreFocusOut: true,
         prompt:
-          "Please share what went wrong with the last completion. The details of the completion as well as this message will be sent to the Continue team in order to improve.",
+          "Please share what went wrong with the last completion. This is only sent if you've configured a remote config server; otherwise nothing is transmitted.",
       });
       if (feedback) {
         const client = await continueServerClientPromise;
@@ -887,7 +888,6 @@ export function registerAllCommands(
   verticalDiffManager: VerticalDiffManager,
   continueServerClientPromise: Promise<ContinueServerClient>,
   battery: Battery,
-  quickEdit: QuickEdit,
   core: Core,
   editDecorationManager: EditDecorationManager,
 ) {
@@ -901,7 +901,6 @@ export function registerAllCommands(
       verticalDiffManager,
       continueServerClientPromise,
       battery,
-      quickEdit,
       core,
       editDecorationManager,
     ),

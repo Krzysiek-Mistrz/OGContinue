@@ -1,11 +1,15 @@
 import { Editor } from "@tiptap/react";
-import { InputModifiers } from "core";
+import { InputModifiers, MessageModes } from "core";
 import { rifWithContentsToContextItem } from "core/commands/util";
 import { MutableRefObject } from "react";
 import { useWebviewListener } from "../../../hooks/useWebviewListener";
 import { clearCodeToEdit } from "../../../redux/slices/editModeState";
-import { setNewestToolbarPreviewForInput } from "../../../redux/slices/sessionSlice";
+import {
+  setMode,
+  setNewestToolbarPreviewForInput,
+} from "../../../redux/slices/sessionSlice";
 import { AppDispatch } from "../../../redux/store";
+import { exitEditMode } from "../../../redux/thunks/editMode";
 import { loadSession, saveCurrentSession } from "../../../redux/thunks/session";
 import { CodeBlock, PromptBlock } from "./extensions";
 
@@ -17,6 +21,7 @@ export function useMainEditorWebviewListeners({
   onEnterRef,
   dispatch,
   historyLength,
+  mode,
   inputId,
   editorFocusedRef,
 }: {
@@ -24,6 +29,7 @@ export function useMainEditorWebviewListeners({
   onEnterRef: MutableRefObject<(modifiers: InputModifiers) => void>;
   dispatch: AppDispatch;
   historyLength: number;
+  mode: MessageModes;
   inputId: string;
   editorFocusedRef: MutableRefObject<boolean | undefined>;
 }) {
@@ -74,11 +80,19 @@ export function useMainEditorWebviewListeners({
   useWebviewListener(
     "focusContinueInputWithoutClear",
     async () => {
+      // Ctrl+L always means "chat" — switch the current session into chat
+      // mode instead of leaving it in whatever mode (e.g. edit) it was in.
+      if (mode === "edit") {
+        await dispatch(exitEditMode({ goToMode: "chat" }));
+      } else if (mode !== "chat") {
+        dispatch(setMode("chat"));
+      }
+
       setTimeout(() => {
         editor?.commands.focus("end");
       }, 20);
     },
-    [editor],
+    [editor, mode, dispatch],
   );
 
   useWebviewListener(

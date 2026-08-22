@@ -43,6 +43,7 @@ export const MainEditorProvider: React.FC<{ children: React.ReactNode }> = ({
   const onEnterRef = useRef<(modifiers: InputModifiers) => void>(() => {});
   const editorFocusedRef = useRef<boolean>(false);
   const historyLength = useAppSelector((store) => store.session.history.length);
+  const mode = useAppSelector((store) => store.session.mode);
 
   // Listen for changes to mainEditorContentTrigger in Redux
   const mainEditorContentTrigger = useAppSelector(
@@ -82,6 +83,7 @@ export const MainEditorProvider: React.FC<{ children: React.ReactNode }> = ({
     onEnterRef,
     dispatch,
     historyLength,
+    mode,
     inputId: inputId || "",
     editorFocusedRef,
   });

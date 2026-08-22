@@ -13,10 +13,7 @@ import {
 import { useAppDispatch, useAppSelector } from "../redux/hooks";
 import { selectCurrentToolCallApplyState } from "../redux/selectors/selectCurrentToolCall";
 import { setConfigResult } from "../redux/slices/configSlice";
-import {
-  setLastNonEditSessionEmpty,
-  updateEditStateApplyState,
-} from "../redux/slices/editModeState";
+import { updateEditStateApplyState } from "../redux/slices/editModeState";
 import { updateIndexingStatus } from "../redux/slices/indexingSlice";
 import {
   acceptToolCall,
@@ -291,12 +288,6 @@ function ParallelListeners() {
     [currentToolCallApplyState, history],
   );
 
-  const mode = useAppSelector((store) => store.session.mode);
-  useEffect(() => {
-    if (mode !== "edit") {
-      dispatch(setLastNonEditSessionEmpty(history.length === 0));
-    }
-  }, [mode, history]);
   return <></>;
 }
 

@@ -52,11 +52,7 @@ const saveSubsetFilters = [
     // codeBlockApplyStates
     // symbols
   ]),
-  createFilter("editModeState", [
-    "returnToMode",
-    "lastNonEditSessionWasEmpty",
-    "codeToEdit",
-  ]),
+  createFilter("editModeState", ["returnToMode", "codeToEdit"]),
   createFilter("config", ["defaultModelTitle"]),
   createFilter("ui", ["toolSettings", "toolGroupSettings"]),
   createFilter("indexing", []),

@@ -11,7 +11,7 @@ import {
 } from "../slices/editModeState";
 import { newSession, setActive, setMode } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
-import { loadLastSession, saveCurrentSession } from "./session";
+import { saveCurrentSession } from "./session";
 import { streamThunkWrapper } from "./streamThunkWrapper";
 
 export const streamEditThunk = createAsyncThunk<
@@ -83,14 +83,11 @@ export const exitEditMode = createAsyncThunk<
     dispatch(clearCodeToEdit());
     dispatch(updateEditStateApplyState(INITIAL_EDIT_APPLY_STATE));
 
-    if (openNewSession || state.editModeState.lastNonEditSessionWasEmpty) {
+    // enterEditMode no longer swaps to a dedicated session, so exiting
+    // doesn't need to restore a "previous" one either — we just switch mode
+    // in place, unless a new session was explicitly requested.
+    if (openNewSession) {
       dispatch(newSession());
-    } else {
-      await dispatch(
-        loadLastSession({
-          saveCurrentSession: false,
-        }),
-      );
     }
 
     dispatch(setMode(goToMode ?? state.editModeState.returnToMode));
@@ -112,7 +109,10 @@ export const enterEditMode = createAsyncThunk<
 
   await dispatch(
     saveCurrentSession({
-      openNewSession: true,
+      // Stay in the current session if one is already active — only an
+      // empty session gets a fresh start (saveCurrentSession is a no-op
+      // when history is empty either way).
+      openNewSession: false,
       // Because this causes a lag before Edit mode is focused. TODO just have that happen in background
       generateTitle: false,
     }),

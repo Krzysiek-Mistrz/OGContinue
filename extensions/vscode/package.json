@@ -84,7 +84,7 @@
       }
     ],
     "configuration": {
-      "title": "Continue",
+      "title": "OGContinue",
       "properties": {
         "continue.telemetryEnabled": {
           "type": "boolean",
@@ -146,183 +146,183 @@
     "commands": [
       {
         "command": "continue.applyCodeFromChat",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Apply code from chat",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.acceptDiff",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Accept Diff",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.rejectDiff",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Reject Diff",
-        "group": "Continue",
+        "group": "OGContinue",
         "icon": "$(stop)"
       },
       {
         "command": "continue.acceptVerticalDiffBlock",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Accept Vertical Diff Block",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.rejectVerticalDiffBlock",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Reject Vertical Diff Block",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.focusEdit",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Generate Code",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.focusContinueInput",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Add Highlighted Code to Context and Clear Chat",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.focusContinueInputWithoutClear",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Add Highlighted Code to Context",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.debugTerminal",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Debug Terminal",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.exitEditMode",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Exit Edit Mode",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.toggleFullScreen",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Open in new window",
         "icon": "$(link-external)",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.openConfigPage",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Open Settings",
         "icon": "$(gear)",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.toggleTabAutocompleteEnabled",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Toggle Autocomplete Enabled",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.selectFilesAsContext",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Select Files as Context",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.newSession",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "New Session",
         "icon": "$(add)",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.viewHistory",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "View History",
         "icon": "$(history)",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.viewLogs",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "View History",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.clearConsole",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Clear Console",
         "icon": "$(clear-all)",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.navigateTo",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Navigate to a path",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.writeCommentsForCode",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Write Comments for this Code",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.writeDocstringForCode",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Write a Docstring for this Code",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.fixCode",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Fix this Code",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.optimizeCode",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Optimize this Code",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.fixGrammar",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Fix Grammar / Spelling",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.codebaseForceReIndex",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Codebase Force Re-Index",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.rebuildCodebaseIndex",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Rebuild codebase index",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.docsIndex",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Docs Index",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.docsReIndex",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Docs Force Re-Index",
-        "group": "Continue"
+        "group": "OGContinue"
       },
       {
         "command": "continue.focusContinueInput",
-        "category": "Continue",
+        "category": "OGContinue",
         "title": "Focus Continue Chat",
-        "group": "Continue"
+        "group": "OGContinue"
       }
     ],
     "keybindings": [
@@ -444,39 +444,39 @@
       "editor/title/run": [
         {
           "command": "continue.rejectDiff",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "continue.streamingDiff"
         }
       ],
       "continue.continueSubMenu": [
         {
           "command": "continue.focusContinueInputWithoutClear",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection"
         },
         {
           "command": "continue.writeCommentsForCode",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection && !editorReadonly"
         },
         {
           "command": "continue.writeDocstringForCode",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection && !editorReadonly"
         },
         {
           "command": "continue.fixCode",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection && !editorReadonly"
         },
         {
           "command": "continue.optimizeCode",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection && !editorReadonly"
         },
         {
           "command": "continue.fixGrammar",
-          "group": "Continue",
+          "group": "OGContinue",
           "when": "editorHasSelection && editorLangId == 'markdown' && !editorReadonly"
         }
       ],
@@ -536,14 +536,14 @@
       "activitybar": [
         {
           "id": "continue",
-          "title": "Continue",
+          "title": "OGContinue",
           "icon": "media/sidebar-icon.png"
         }
       ],
       "panel": [
         {
           "id": "continueConsole",
-          "title": "Continue Console",
+          "title": "OGContinue Console",
           "icon": "$(window)"
         }
       ]

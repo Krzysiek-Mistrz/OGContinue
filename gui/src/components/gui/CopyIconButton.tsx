@@ -8,6 +8,7 @@ interface CopyIconButtonProps {
   checkIconClassName?: string;
   clipboardIconClassName?: string;
   tooltipPlacement?: "top" | "bottom";
+  tooltipText?: string;
 }
 
 export function CopyIconButton({
@@ -16,6 +17,7 @@ export function CopyIconButton({
   checkIconClassName = "h-4 w-4 text-green-400",
   clipboardIconClassName = "h-4 w-4 text-gray-400",
   tooltipPlacement = "bottom",
+  tooltipText = "Copy",
 }: CopyIconButtonProps) {
   const { copyText, copied } = useCopy(text);
 
@@ -24,7 +26,7 @@ export function CopyIconButton({
       <HeaderButtonWithToolTip
         tooltipPlacement={tooltipPlacement}
         tabIndex={tabIndex}
-        text={copied ? "Copied" : "Copy"}
+        text={copied ? "Copied" : tooltipText}
         onClick={copyText}
       >
         {copied ? (

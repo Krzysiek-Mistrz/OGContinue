@@ -11,6 +11,8 @@ export interface ResponseActionsProps {
   index: number;
   onDelete: () => void;
   item: ChatHistoryItem;
+  isLast?: boolean;
+  fullHistory?: ChatHistoryItem[];
 }
 
 export default function ResponseActions({
@@ -19,6 +21,8 @@ export default function ResponseActions({
   item,
   isTruncated,
   onDelete,
+  isLast,
+  fullHistory,
 }: ResponseActionsProps) {
   return (
     <div className="mx-2 flex cursor-default items-center justify-end space-x-1 bg-transparent pb-0 text-xs text-gray-400">
@@ -47,6 +51,23 @@ export default function ResponseActions({
         clipboardIconClassName="h-3.5 w-3.5 text-gray-500"
         checkIconClassName="h-3.5 w-3.5 text-green-400"
       />
+
+      {isLast && fullHistory && fullHistory.length > 1 && (
+        <CopyIconButton
+          tabIndex={-1}
+          tooltipText="Copy all"
+          text={() =>
+            fullHistory
+              .map(
+                (historyItem) =>
+                  `${historyItem.message.role}:\n${renderChatMessage(historyItem.message)}`,
+              )
+              .join("\n\n")
+          }
+          clipboardIconClassName="h-3.5 w-3.5 text-gray-500"
+          checkIconClassName="h-3.5 w-3.5 text-green-400"
+        />
+      )}
 
       <FeedbackButtons item={item} />
     </div>

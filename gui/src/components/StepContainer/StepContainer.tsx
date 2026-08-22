@@ -36,6 +36,7 @@ export default function StepContainer(props: StepContainerProps) {
   const historyItemAfterThis = useAppSelector(
     (state) => state.session.history[props.index + 1],
   );
+  const fullHistory = useAppSelector((state) => state.session.history);
   const uiConfig = useAppSelector(selectUIConfig);
 
   const hideActionSpace =
@@ -112,6 +113,8 @@ export default function StepContainer(props: StepContainerProps) {
               onContinueGeneration={onContinueGeneration}
               index={props.index}
               item={props.item}
+              isLast={props.isLast}
+              fullHistory={fullHistory}
             />
           )}
         </div>

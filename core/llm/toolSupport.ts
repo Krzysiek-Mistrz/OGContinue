@@ -108,6 +108,7 @@ export const PROVIDER_TOOL_SUPPORT: Record<
       modelName = model;
     }
 
+    // Known-bad: models whose Ollama template doesn't support tool calling at all.
     if (
       ["vision", "math", "guard", "mistrallite", "mistral-openorca"].some(
         (part) => modelName.toLowerCase().includes(part),
@@ -115,31 +116,10 @@ export const PROVIDER_TOOL_SUPPORT: Record<
     ) {
       return false;
     }
-    if (
-      [
-        "cogito",
-        "llama3.3",
-        "qwq",
-        "llama3.2",
-        "llama3.1",
-        "qwen2",
-        "qwen3",
-        "mixtral",
-        "command-r",
-        "smollm2",
-        "hermes3",
-        "athene-v2",
-        "nemotron",
-        "llama3-groq",
-        "granite3",
-        "granite-3",
-        "aya-expanse",
-        "firefunction-v2",
-        "mistral",
-      ].some((part) => modelName.toLowerCase().includes(part))
-    ) {
-      return true;
-    }
+    // rather than gating Agent mode behind a
+    // stale allowlist that always lags new/uncommon models, we only block known exceptions
+    // above and otherwise let the user try Agent mode themselves. It's much better approach imo
+    return true;
   },
   sambanova: (model) => {
     // https://docs.sambanova.ai/cloud/docs/capabilities/function-calling

@@ -3,6 +3,7 @@ import {
   DocumentArrowUpIcon,
   TableCellsIcon,
 } from "@heroicons/react/24/outline";
+import { GITHUB_LINK } from "core/util/constants";
 import { useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
@@ -22,10 +23,13 @@ export function HelpCenterSection() {
       <div className="-mx-4 flex flex-col">
         <MoreHelpRow
           title="Documentation"
-          description="Learn how to configure and use Continue"
+          description="README and setup guides on GitHub"
           Icon={ArrowTopRightOnSquareIcon}
           onClick={() =>
-            ideMessenger.post("openUrl", "https://docs.continue.dev/")
+            ideMessenger.post(
+              "openUrl",
+              "https://github.com/Krzysiek-Mistrz/OGContinue",
+            )
           }
         />
 
@@ -33,21 +37,7 @@ export function HelpCenterSection() {
           title="Have an issue?"
           description="Let us know on GitHub and we'll do our best to resolve it"
           Icon={ArrowTopRightOnSquareIcon}
-          onClick={() =>
-            ideMessenger.post(
-              "openUrl",
-              "https://github.com/continuedev/continue/issues/new/choose",
-            )
-          }
-        />
-
-        <MoreHelpRow
-          title="Join the community!"
-          description="Join us on Discord to stay up-to-date on the latest developments"
-          Icon={ArrowTopRightOnSquareIcon}
-          onClick={() =>
-            ideMessenger.post("openUrl", "https://discord.gg/vapESyrFmJ")
-          }
+          onClick={() => ideMessenger.post("openUrl", GITHUB_LINK)}
         />
 
         <MoreHelpRow

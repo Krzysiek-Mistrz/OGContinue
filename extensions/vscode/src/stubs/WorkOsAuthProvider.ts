@@ -5,7 +5,6 @@ import { getControlPlaneEnvSync } from "core/control-plane/env";
 import fetch from "node-fetch";
 import { v4 as uuidv4 } from "uuid";
 import {
-  authentication,
   AuthenticationProvider,
   AuthenticationProviderAuthenticationSessionsChangeEvent,
   AuthenticationSession,
@@ -80,15 +79,13 @@ export class WorkOsAuthProvider implements AuthenticationProvider, Disposable {
     private readonly context: ExtensionContext,
     private readonly _uriHandler: UriEventHandler,
   ) {
-    this._disposable = Disposable.from(
-      authentication.registerAuthenticationProvider(
-        controlPlaneEnv.AUTH_TYPE,
-        AUTH_NAME,
-        this,
-        { supportsMultipleAccounts: false },
-      ),
-      window.registerUriHandler(this._uriHandler),
-    );
+    // OGContinue is local-only and does not offer hosted accounts, so we
+    // deliberately do not register a real authentication provider here (no
+    // sign-in UI, no calls to Continue Dev/WorkOS servers). The class is
+    // kept only so the rest of the extension can still construct/wire it
+    // without a larger refactor; getControlPlaneSessionInfo() below always
+    // resolves to "no session" instead of ever invoking this provider.
+    this._disposable = Disposable.from();
 
     this.secretStorage = new SecretStorage(context);
   }
@@ -484,27 +481,7 @@ export async function getControlPlaneSessionInfo(
   silent: boolean,
   useOnboarding: boolean,
 ): Promise<ControlPlaneSessionInfo | undefined> {
-  try {
-    if (useOnboarding) {
-      WorkOsAuthProvider.useOnboardingUri = true;
-    }
-
-    const session = await authentication.getSession(
-      controlPlaneEnv.AUTH_TYPE,
-      [],
-      silent ? { silent: true } : { createIfNone: true },
-    );
-    if (!session) {
-      return undefined;
-    }
-    return {
-      accessToken: session.accessToken,
-      account: {
-        id: session.account.id,
-        label: session.account.label,
-      },
-    };
-  } finally {
-    WorkOsAuthProvider.useOnboardingUri = false;
-  }
+  // No hosted account system in OGContinue: always report "not signed in"
+  // instead of prompting a WorkOS/Continue Dev sign-in flow.
+  return undefined;
 }

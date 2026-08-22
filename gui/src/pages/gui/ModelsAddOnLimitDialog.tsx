@@ -1,7 +1,6 @@
-import { DISCORD_LINK, GITHUB_LINK } from "core/util/constants";
+import { GITHUB_LINK } from "core/util/constants";
 import { useContext } from "react";
 import { SecondaryButton } from "../../components";
-import { DiscordIcon } from "../../components/svg/DiscordIcon";
 import { GithubIcon } from "../../components/svg/GithubIcon";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 
@@ -16,7 +15,7 @@ export function ModelsAddOnLimitDialog() {
         <span>
           You have reached the monthly limit for chat requests with the Models
           Add-On. This limit exists to avoid abuse, but if this happened from
-          normal usage we encourage you to contact us on GitHub or Discord
+          normal usage we encourage you to open an issue on GitHub
         </span>
         <div className="flex flex-row flex-wrap items-center gap-2">
           <SecondaryButton
@@ -27,15 +26,6 @@ export function ModelsAddOnLimitDialog() {
           >
             <GithubIcon className="h-5 w-5" />
             <span className="xs:flex hidden">Github</span>
-          </SecondaryButton>
-          <SecondaryButton
-            className="flex flex-row items-center gap-2 hover:opacity-70"
-            onClick={() => {
-              ideMessenger.post("openUrl", DISCORD_LINK);
-            }}
-          >
-            <DiscordIcon className="h-5 w-5" />
-            <span className="xs:flex hidden">Discord</span>
           </SecondaryButton>
         </div>
       </div>

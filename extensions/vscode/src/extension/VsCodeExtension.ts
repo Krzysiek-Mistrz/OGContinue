@@ -27,7 +27,6 @@ import { VerticalDiffManager } from "../diff/vertical/manager";
 import { registerAllCodeLensProviders } from "../lang-server/codeLens";
 import { registerAllPromptFilesCompletionProviders } from "../lang-server/promptFileCompletions";
 import EditDecorationManager from "../quickEdit/EditDecorationManager";
-import { QuickEdit } from "../quickEdit/QuickEditQuickPick";
 import { setupRemoteConfigSync } from "../stubs/activation";
 import { UriEventHandler } from "../stubs/uriHandler";
 import {
@@ -213,15 +212,6 @@ export class VsCodeExtension {
       this.ide,
     );
 
-    const quickEdit = new QuickEdit(
-      this.verticalDiffManager,
-      this.configHandler,
-      this.sidebar.webviewProtocol,
-      this.ide,
-      context,
-      this.fileSearch,
-    );
-
     // LLM Log view
     this.consoleView = new ContinueConsoleWebviewViewProvider(
       this.windowId,
@@ -247,7 +237,6 @@ export class VsCodeExtension {
       this.verticalDiffManager,
       this.core.continueServerClientPromise,
       this.battery,
-      quickEdit,
       this.core,
       this.editDecorationManager,
     );

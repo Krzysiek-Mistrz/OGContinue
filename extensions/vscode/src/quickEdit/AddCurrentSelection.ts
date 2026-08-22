@@ -3,7 +3,7 @@ import { VerticalDiffManager } from "../diff/vertical/manager";
 import { getRangeInFileWithContents } from "../util/addCode";
 import { VsCodeWebviewProtocol } from "../webviewProtocol";
 import EditDecorationManager from "./EditDecorationManager";
-import { QuickEditShowParams } from "./QuickEditQuickPick";
+import { QuickEditShowParams } from "./QuickEditShowParams";
 
 export async function addCurrentSelectionToEdit({
   webviewProtocol,

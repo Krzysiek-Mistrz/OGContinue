@@ -2,7 +2,7 @@ import { ContinueConfig, QuickActionConfig } from "core";
 import { Telemetry } from "core/util/posthog";
 import * as vscode from "vscode";
 
-import { QuickEditShowParams } from "../../../quickEdit/QuickEditQuickPick";
+import { QuickEditShowParams } from "../../../quickEdit/QuickEditShowParams";
 import {
   CONTINUE_WORKSPACE_KEY,
   getContinueWorkspaceConfig,
@@ -83,7 +83,7 @@ export class QuickActionsCodeLensProvider implements vscode.CodeLensProvider {
   getDefaultCommand(range: vscode.Range): vscode.Command[] {
     const quickEdit: vscode.Command = {
       command: "continue.defaultQuickAction",
-      title: "Continue",
+      title: "OGContinue",
       arguments: [{ range } as QuickEditShowParams],
     };
 

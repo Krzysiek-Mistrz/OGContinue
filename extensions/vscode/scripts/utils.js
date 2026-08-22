@@ -37,30 +37,6 @@ function copyConfigSchema() {
       "<p>If set to <code>merge</code>, <code>.continuerc.json</code> will be applied on top of <code>config.json</code> (arrays and objects are merged). If set to <code>overwrite</code>, then every top-level property of <code>.continuerc.json</code> will overwrite that property from <code>config.json</code>.</p>",
   };
   fs.writeFileSync("continue_rc_schema.json", JSON.stringify(schema, null, 2));
-
-  // Copy config schemas to intellij
-  fs.copyFileSync(
-    "config_schema.json",
-    path.join(
-      "..",
-      "intellij",
-      "src",
-      "main",
-      "resources",
-      "config_schema.json",
-    ),
-  );
-  fs.copyFileSync(
-    "continue_rc_schema.json",
-    path.join(
-      "..",
-      "intellij",
-      "src",
-      "main",
-      "resources",
-      "continue_rc_schema.json",
-    ),
-  );
 }
 
 function copyTokenizers() {
@@ -102,45 +78,7 @@ async function buildGui(isGhAction) {
     execCmdSync("npm run build");
   }
 
-  // Copy over the dist folder to the JetBrains extension //
-  const intellijExtensionWebviewPath = path.join(
-    "..",
-    "extensions",
-    "intellij",
-    "src",
-    "main",
-    "resources",
-    "webview",
-  );
-
-  const indexHtmlPath = path.join(intellijExtensionWebviewPath, "index.html");
-  fs.copyFileSync(indexHtmlPath, "tmp_index.html");
-  rimrafSync(intellijExtensionWebviewPath);
-  fs.mkdirSync(intellijExtensionWebviewPath, { recursive: true });
-
-  await new Promise((resolve, reject) => {
-    ncp("dist", intellijExtensionWebviewPath, (error) => {
-      if (error) {
-        console.warn(
-          "[error] Error copying React app build to JetBrains extension: ",
-          error,
-        );
-        reject(error);
-      }
-      resolve();
-    });
-  });
-
-  // Put back index.html
-  if (fs.existsSync(indexHtmlPath)) {
-    rimrafSync(indexHtmlPath);
-  }
-  fs.copyFileSync("tmp_index.html", indexHtmlPath);
-  fs.unlinkSync("tmp_index.html");
-
-  console.log("[info] Copied gui build to JetBrains extension");
-
-  // Then copy over the dist folder to the VSCode extension //
+  // Copy over the dist folder to the VSCode extension //
   const vscodeGuiPath = path.join("../extensions/vscode/gui");
   fs.mkdirSync(vscodeGuiPath, { recursive: true });
   await new Promise((resolve, reject) => {

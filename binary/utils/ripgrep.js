@@ -8,25 +8,43 @@ const AdmZip = require("adm-zip");
 const RIPGREP_BASE_URL = `https://github.com/BurntSushi/ripgrep/releases/download/${RIPGREP_VERSION}`;
 
 /**
- * Downloads a file from a URL to a specified path
+ * Downloads a file from a URL to a specified path, retrying on transient
+ * network errors (e.g. a socket closed mid-download on a slow connection).
  *
  * @param {string} url - The URL to download from
  * @param {string} destPath - The destination path for the downloaded file
+ * @param {number} maxRetries - How many attempts to make before giving up
  * @returns {Promise<void>}
  */
-async function downloadFile(url, destPath) {
-  // Use the built-in fetch API instead of node-fetch
-  const response = await fetch(url, {
-    redirect: "follow", // Automatically follow redirects
-  });
+async function downloadFile(url, destPath, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Use the built-in fetch API instead of node-fetch
+      const response = await fetch(url, {
+        redirect: "follow", // Automatically follow redirects
+      });
 
-  if (!response.ok) {
-    throw new Error(`Failed to download file, status code: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(
+          `Failed to download file, status code: ${response.status}`,
+        );
+      }
+
+      // Get the response as an array buffer and write it to the file
+      const buffer = await response.arrayBuffer();
+      fs.writeFileSync(destPath, Buffer.from(buffer));
+      return;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      const delayMs = attempt * 2000;
+      console.warn(
+        `[warn] Download attempt ${attempt}/${maxRetries} failed (${error.message}), retrying in ${delayMs}ms...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
   }
-
-  // Get the response as an array buffer and write it to the file
-  const buffer = await response.arrayBuffer();
-  fs.writeFileSync(destPath, Buffer.from(buffer));
 }
 
 /**

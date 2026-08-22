@@ -189,16 +189,6 @@
       }
     },
     {
-      "label": "docs:start",
-      "type": "shell",
-      "command": "npm",
-      "args": ["run", "start", "--", "--no-open"],
-      "problemMatcher": [],
-      "options": {
-        "cwd": "docs"
-      }
-    },
-    {
       "label": "clean",
       "type": "shell",
       "command": "node",

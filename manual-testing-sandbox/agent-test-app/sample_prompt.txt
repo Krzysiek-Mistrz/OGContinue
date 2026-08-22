@@ -1,0 +1,1 @@
+Fix type mismatches in formatters/text.py and division guard in math_utils/stats.py so that src/main.py executes without errors.

@@ -349,12 +349,13 @@ async function configYamlToContinueConfig(options: {
     }
   }
 
-  // Add transformers js to the embed models in vs code if not already added
+  // Offer the bundled embeddings model only when the config declares no embed
+  // model of its own. Adding it unconditionally means a previously persisted
+  // selection of it keeps shadowing the model the user actually configured,
+  // with no indication in the UI that their choice is being ignored.
   if (
     ideInfo.ideType === "vscode" &&
-    !continueConfig.modelsByRole.embed.find(
-      (m) => m.providerName === "transformers.js",
-    )
+    continueConfig.modelsByRole.embed.length === 0
   ) {
     continueConfig.modelsByRole.embed.push(
       new TransformersJsEmbeddingsProvider(),

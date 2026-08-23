@@ -3,7 +3,69 @@ import util from "node:util";
 
 import { fileURLToPath } from "node:url";
 import { ToolImpl } from ".";
+import { resolveRelativePathInDir, resolveWorkspacePath } from "../../util/ideUtils";
 import { isProcessBackgrounded, removeBackgroundedProcess } from "../../util/processTerminalBackgroundStates";
+import { findUriInDirs } from "../../util/uri";
+
+/**
+ * Commands run from the workspace root, but the model has usually just been
+ * reading a file somewhere below it and writes paths relative to that file
+ * instead. The resulting "No such file or directory" names the path it tried,
+ * which small models read as "the file is missing" - one went on to recreate a
+ * file that already existed. So on failure, say where the command actually ran
+ * and where the paths it named really are.
+ */
+const MAX_PATH_HINTS = 3;
+
+async function describeWrongPaths(
+  command: string,
+  extras: Parameters<ToolImpl>[1],
+): Promise<string> {
+  const tokens = command.match(/[\w.-]*\/[\w./-]+|\b[\w-]+\.[A-Za-z0-9]+\b/g);
+  if (!tokens) {
+    return "";
+  }
+
+  const dirs = await extras.ide.getWorkspaceDirs();
+  const hints: string[] = [];
+
+  for (const token of new Set(tokens)) {
+    if (hints.length >= MAX_PATH_HINTS) {
+      break;
+    }
+    if (await resolveRelativePathInDir(token, extras.ide, dirs)) {
+      continue;
+    }
+    const resolved = await resolveWorkspacePath(token, extras.ide);
+    if (!resolved) {
+      continue;
+    }
+    const { relativePathOrBasename } = findUriInDirs(resolved, dirs);
+    if (relativePathOrBasename && relativePathOrBasename !== token) {
+      hints.push(
+        `"${token}" does not exist relative to the working directory, but "${relativePathOrBasename}" does.`,
+      );
+    }
+  }
+
+  return hints.join("\n");
+}
+
+async function withPathHints(
+  output: string,
+  command: string,
+  cwd: string,
+  extras: Parameters<ToolImpl>[1],
+): Promise<string> {
+  const hints = await describeWrongPaths(command, extras);
+  return [
+    output,
+    `\nThe command ran in ${cwd}. Paths in a command are relative to that directory.`,
+    hints,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
 
 const asyncExec = util.promisify(childProcess.exec);
 
@@ -145,15 +207,21 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
                     ]);
                   } else {
                     const status = `Command failed with exit code ${code}`;
-                    resolve([
-                      {
-                        name: "Terminal",
-                        description: "Terminal command output",
-                        content:
-                          terminalOutput,
-                          status: status,
-                      },
-                    ]);
+                    void withPathHints(
+                      terminalOutput,
+                      args.command,
+                      cwd,
+                      extras,
+                    ).then((content) =>
+                      resolve([
+                        {
+                          name: "Terminal",
+                          description: "Terminal command output",
+                          content,
+                          status,
+                        },
+                      ]),
+                    );
                   }
                 }
               });
@@ -248,7 +316,12 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
             {
               name: "Terminal",
               description: "Terminal command output",
-              content: error.stderr ?? error.toString(),
+              content: await withPathHints(
+                error.stderr ?? error.toString(),
+                args.command,
+                cwd,
+                extras,
+              ),
               status: status,
             },
           ];

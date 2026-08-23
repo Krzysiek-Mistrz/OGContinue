@@ -2,8 +2,10 @@ import { useCallback, useContext, useEffect, useRef } from "react";
 import { VSC_THEME_COLOR_VARS } from "../components";
 import { IdeMessengerContext } from "../context/IdeMessenger";
 
+import { ApplyState, ContextItem } from "core";
 import { EDIT_MODE_STREAM_ID } from "core/edit/constants";
 import { FromCoreProtocol } from "core/protocol";
+import { getUriPathBasename } from "core/util/uri";
 import {
   initializeProfilePreferences,
   setOrganizations,
@@ -19,6 +21,7 @@ import {
   acceptToolCall,
   addContextItemsAtIndex,
   updateApplyState,
+  updateToolCallOutput,
 } from "../redux/slices/sessionSlice";
 import { setTTSActive } from "../redux/slices/uiSlice";
 import { streamResponseAfterToolCall } from "../redux/thunks";
@@ -29,6 +32,36 @@ import { updateFileSymbolsFromHistory } from "../redux/thunks/updateFileSymbols"
 import { isJetBrains } from "../util";
 import { setLocalStorage } from "../util/localStorage";
 import { useWebviewListener } from "./useWebviewListener";
+
+/**
+ * The edit tool resolves before the user has accepted or rejected the diff, so
+ * its result is filled in here once the diff closes. Sending back nothing at
+ * all - which is what used to happen - leaves the model with no evidence its
+ * edit ever landed, and small local models respond to that by reissuing the
+ * same edit over and over.
+ *
+ * "closed" only means no diff blocks are left pending; it covers a rejection
+ * just as much as an acceptance. So report the file's resulting contents rather
+ * than claiming the change was kept.
+ */
+const MAX_REPORTED_FILE_CHARS = 4000;
+
+function buildEditToolOutput(state: ApplyState): ContextItem {
+  const filepath = state.filepath
+    ? getUriPathBasename(state.filepath)
+    : "the file";
+  const fileContent = state.fileContent ?? "";
+  const content =
+    fileContent && fileContent.length <= MAX_REPORTED_FILE_CHARS
+      ? `The edit to ${filepath} is complete and no changes are left pending. The file now contains:\n\n${fileContent}\n\nDo not make this same edit again.`
+      : `The edit to ${filepath} is complete and no changes are left pending. Do not make this same edit again.`;
+
+  return {
+    name: "Edit results",
+    description: `Result of editing ${filepath}`,
+    content,
+  };
+}
 
 function ParallelListeners() {
   const dispatch = useAppDispatch();
@@ -266,22 +299,15 @@ function ParallelListeners() {
           currentToolCallApplyState &&
           currentToolCallApplyState.streamId === state.streamId
         ) {
-          // const output: ContextItem = {
-          //   name: "Edit tool output",
-          //   content: "Completed edit",
-          //   description: "",
-          // };
+          const toolCallId = currentToolCallApplyState.toolCallId!;
+          dispatch(acceptToolCall({ toolCallId }));
           dispatch(
-            acceptToolCall({
-              toolCallId: currentToolCallApplyState.toolCallId!,
+            updateToolCallOutput({
+              toolCallId,
+              contextItems: [buildEditToolOutput(state)],
             }),
           );
-          // dispatch(setToolCallOutput([]));
-          dispatch(
-            streamResponseAfterToolCall({
-              toolCallId: currentToolCallApplyState.toolCallId!,
-            }),
-          );
+          dispatch(streamResponseAfterToolCall({ toolCallId }));
         }
       }
     },

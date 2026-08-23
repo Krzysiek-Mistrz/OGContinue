@@ -30,7 +30,10 @@ exec(command, (error) => {
   if (error) {
     throw error;
   }
+  const name = JSON.parse(
+    fs.readFileSync("./package.json", { encoding: "utf-8" }),
+  ).name;
   console.log(
-    `vsce package completed - extension created at extensions/vscode/build/continue-${version}.vsix`,
+    `vsce package completed - extension created at extensions/vscode/build/${name}-${version}.vsix`,
   );
 });

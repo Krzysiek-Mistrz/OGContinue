@@ -1,17 +1,49 @@
-import { resolveRelativePathInDir } from "../../util/ideUtils";
+import { resolveWorkspacePath } from "../../util/ideUtils";
 import { getUriPathBasename } from "../../util/uri";
 
 import { ToolImpl } from ".";
 
-export const readFileImpl: ToolImpl = async (args, extras) => {
-  const firstUriMatch = await resolveRelativePathInDir(
-    args.filepath,
-    extras.ide,
-  );
-  if (!firstUriMatch) {
-    throw new Error(`Could not find file ${args.filepath}`);
+const MAX_SUGGESTIONS = 10;
+
+/**
+ * When a path cannot be resolved at all, point the model at the real
+ * locations of that filename so it can retry instead of stalling.
+ */
+async function describeMissingFile(
+  filepath: string,
+  extras: Parameters<ToolImpl>[1],
+): Promise<string> {
+  const basename = getUriPathBasename(filepath);
+  let matches: string[] = [];
+  try {
+    matches = (await extras.ide.getFileResults(`**/${basename}`))
+      .map((match) => match.trim())
+      .filter(Boolean);
+  } catch {
+    // Searching is best effort.
   }
-  const content = await extras.ide.readFile(firstUriMatch);
+
+  if (matches.length === 0) {
+    return `Could not find file ${filepath}, and no file named ${basename} exists in the workspace. Use the list or glob tools to discover the correct path.`;
+  }
+
+  const shown = matches.slice(0, MAX_SUGGESTIONS);
+  const more =
+    matches.length > shown.length
+      ? `\n(${matches.length - shown.length} more matches not shown)`
+      : "";
+
+  return `Could not find file ${filepath}. Files named ${basename} exist at these paths:\n${shown.join("\n")}${more}\nRetry with one of these exact paths.`;
+}
+
+export const readFileImpl: ToolImpl = async (args, extras) => {
+  const resolvedUri = await resolveWorkspacePath(args.filepath, extras.ide);
+
+  if (!resolvedUri) {
+    throw new Error(await describeMissingFile(args.filepath, extras));
+  }
+
+  const content = await extras.ide.readFile(resolvedUri);
   return [
     {
       name: getUriPathBasename(args.filepath),
@@ -19,7 +51,7 @@ export const readFileImpl: ToolImpl = async (args, extras) => {
       content,
       uri: {
         type: "file",
-        value: firstUriMatch,
+        value: resolvedUri,
       },
     },
   ];

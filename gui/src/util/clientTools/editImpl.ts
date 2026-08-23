@@ -1,4 +1,4 @@
-import { resolveRelativePathInDir } from "core/util/ideUtils";
+import { resolveWorkspacePath } from "core/util/ideUtils";
 import { ClientToolImpl } from "./callClientTool";
 
 export const editToolImpl: ClientToolImpl = async (
@@ -9,7 +9,7 @@ export const editToolImpl: ClientToolImpl = async (
   if (!extras.streamId) {
     throw new Error("Invalid apply state");
   }
-  const firstUriMatch = await resolveRelativePathInDir(
+  const firstUriMatch = await resolveWorkspacePath(
     args.filepath,
     extras.ideMessenger.ide,
   );

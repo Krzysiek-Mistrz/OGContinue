@@ -21,7 +21,7 @@ export const lsTool: Tool = {
         dirPath: {
           type: "string",
           description:
-            "The directory path relative to the root of the project. Always use forward slash paths like '/'. rather than e.g. '.'",
+            "The directory path relative to the root of the project, using forward slashes, e.g. 'src/formatters'. Use '/' for the project root. Do not pass an absolute filesystem path.",
         },
         recursive: {
           type: "boolean",

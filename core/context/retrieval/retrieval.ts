@@ -94,8 +94,11 @@ export async function retrieveContextItemsFromEmbeddings(
   return [
     {
       ...INSTRUCTIONS_BASE_ITEM,
+      // Deliberately does not tell the model to stay within the shown files:
+      // this text is attached in agent mode too, where instructing the model to
+      // answer only from the excerpts stops it from using its tools at all.
       content:
-        "Use the above code to answer the following question. You should not reference any files outside of what is shown, unless they are commonly known files, like a .gitignore or package.json. Reference the filenames whenever possible. If there isn't enough information to answer the question, suggest where the user might look to learn more.",
+        "The code above was retrieved from the workspace as context for the request below. It is a set of excerpts, not the whole codebase, so do not assume it is complete and do not invent the contents of files that are not shown. Reference filenames whenever possible.",
     },
     ...results
       .sort((a, b) => a.filepath.localeCompare(b.filepath))

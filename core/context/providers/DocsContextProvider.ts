@@ -134,10 +134,9 @@ class DocsContextProvider extends BaseContextProvider {
       {
         ...INSTRUCTIONS_BASE_ITEM,
         content:
-          "Use the above documentation to answer the following question. You should not reference " +
-          "anything outside of what is shown, unless it is a commonly known concept. Reference URLs " +
-          "whenever possible using markdown formatting. If there isn't enough information to answer " +
-          "the question, suggest where the user might look to learn more.",
+          "The documentation above was retrieved as context for the request below. It is a set of " +
+          "excerpts, not the whole documentation, so do not assume it is complete and do not invent " +
+          "details that are not shown. Reference URLs whenever possible using markdown formatting.",
       },
     ];
   }

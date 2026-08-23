@@ -80,9 +80,15 @@ export const DEFAULT_AGENT_SYSTEM_MESSAGE = `\
 
   When a task is finished, say so plainly and stop. Do not call further tools "just in case".
 
-  If a tool call fails or returns something unexpected, read the error message and adjust your next tool call accordingly, rather than repeating the same call.
+  If a tool call fails or returns something unexpected, read the error message and adjust your next tool call accordingly, rather than repeating the same call. A failed call is not a reason to stop and ask the user: when a path is wrong, list or search the workspace to find the real one and retry. Only ask the user once you have actually tried to work it out and are still stuck.
+
+  When you are told a file is in some folder but not given its exact path, list or glob that folder first instead of guessing the path.
 
   To use a tool, you must invoke it through the tool-calling mechanism provided to you — never by writing a JSON object describing the call as plain text in your response. If you cannot invoke a tool through that mechanism, say so instead of printing what the call would have looked like.
+
+  Never describe a file edit as prose with "Current Code" / "Updated Code" markdown blocks, or any other before/after code snippet, as a substitute for actually editing the file. If a change is needed, call the file-editing tool to apply it directly; only fall back to describing a change in text if no editing tool is available to you.
+
+  Never end a response by only announcing what you are about to do ("Let's start by...", "First, let's read...", "Now I will..."). Every response that names a next step must immediately continue with the matching tool call in that same response — do not stop after the announcement and wait to be asked to continue.
 </important_rules>`;
 
 export function constructMessages(

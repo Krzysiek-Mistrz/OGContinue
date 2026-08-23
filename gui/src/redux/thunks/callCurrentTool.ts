@@ -17,9 +17,15 @@ import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
  * Small local models get stuck reissuing one tool call verbatim - the same ls
  * of a directory that does not resolve, or the same no-op edit - and will keep
  * going until the user stops them. The result cannot change, so refuse the call
- * after it has already been made twice and tell the model to do something else.
+ * once it has already been made twice and tell the model to do something else.
+ *
+ * Telling it is not enough on its own: a model already stuck in a loop tends to
+ * answer the refusal with the very same call again, which would just bounce off
+ * the guard forever. So the refusal buys a couple of chances to recover, and
+ * past that the turn ends instead of streaming another response.
  */
 const IDENTICAL_CALL_LIMIT = 2;
+const IDENTICAL_CALL_HARD_LIMIT = 4;
 
 function canonicalizeArgs(args: unknown): string {
   return JSON.stringify(args, (_key, value) =>
@@ -66,6 +72,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
     }).length;
 
     if (identicalCalls >= IDENTICAL_CALL_LIMIT) {
+      const givingUp = identicalCalls >= IDENTICAL_CALL_HARD_LIMIT;
       dispatch(
         updateToolCallOutput({
           toolCallId,
@@ -74,14 +81,20 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
               icon: "problems",
               name: "Repeated Tool Call",
               description: "Tool Call Blocked",
-              content: `${toolName} has already been called ${identicalCalls} times with exactly these arguments, so calling it again cannot produce a different result. Do not repeat it. Change the arguments, use a different tool, or - if you already have what you need - give the user your answer. If you are genuinely stuck, explain what you tried and stop.`,
+              content: givingUp
+                ? `${toolName} was called ${identicalCalls} times with exactly these arguments and blocked each time. Stopping here so it does not loop indefinitely.`
+                : `${toolName} has already been called ${identicalCalls} times with exactly these arguments, so calling it again cannot produce a different result. Do not repeat it. Change the arguments, use a different tool, or - if you already have what you need - give the user your answer. If you are genuinely stuck, explain what you tried and stop.`,
               hidden: false,
             },
           ],
         }),
       );
       dispatch(errorToolCall({ toolCallId }));
-      unwrapResult(await dispatch(streamResponseAfterToolCall({ toolCallId })));
+      if (!givingUp) {
+        unwrapResult(
+          await dispatch(streamResponseAfterToolCall({ toolCallId })),
+        );
+      }
       return;
     }
 

@@ -136,7 +136,11 @@ describe("DocsCrawler", () => {
     });
   });
 
-  describe("Default Crawler", () => {
+  // DefaultCrawler calls TRIAL_PROXY_URL, Continue Dev's hosted crawling
+  // service. This fork ships no such service, so that call always fails and
+  // DocsCrawler falls back to cheerio - the same fallback it uses for anyone
+  // self-hosting without that proxy.
+  describe("Default Crawler falls back to Cheerio", () => {
     beforeAll(() => {
       docsCrawler = new DocsCrawler(mockIde, config, 2, 2, false);
     });
@@ -146,7 +150,7 @@ describe("DocsCrawler", () => {
       async () => {
         const { pages, crawler } = await runCrawl("https://amplified.dev/");
         expect(pages.length).toBeGreaterThanOrEqual(1);
-        expect(crawler).toEqual("default");
+        expect(crawler).toEqual("cheerio");
       },
       TIMEOUT_MS,
     );
@@ -157,7 +161,7 @@ describe("DocsCrawler", () => {
         async () => {
           const { pages, crawler } = await runCrawl(url);
           expect(pages.length).toBeGreaterThanOrEqual(1);
-          expect(crawler).toEqual("default");
+          expect(crawler).toEqual("cheerio");
         },
         TIMEOUT_MS,
       );

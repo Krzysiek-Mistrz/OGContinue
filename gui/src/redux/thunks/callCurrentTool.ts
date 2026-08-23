@@ -13,6 +13,24 @@ import {
 import { ThunkApiType } from "../store";
 import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
 
+/**
+ * Small local models get stuck reissuing one tool call verbatim - the same ls
+ * of a directory that does not resolve, or the same no-op edit - and will keep
+ * going until the user stops them. The result cannot change, so refuse the call
+ * after it has already been made twice and tell the model to do something else.
+ */
+const IDENTICAL_CALL_LIMIT = 2;
+
+function canonicalizeArgs(args: unknown): string {
+  return JSON.stringify(args, (_key, value) =>
+    value && typeof value === "object" && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([a], [b]) => a.localeCompare(b)),
+        )
+      : value,
+  );
+}
+
 export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
   "chat/callTool",
   async (_, { dispatch, extra, getState }) => {
@@ -34,6 +52,38 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
     }
 
     const { toolCallId } = toolCallState;
+    const toolName = toolCallState.toolCall.function.name;
+
+    const args = canonicalizeArgs(toolCallState.parsedArgs);
+    const identicalCalls = state.session.history.filter((item) => {
+      const previous = item.toolCallState;
+      return (
+        !!previous &&
+        previous.toolCallId !== toolCallId &&
+        previous.toolCall.function.name === toolName &&
+        canonicalizeArgs(previous.parsedArgs) === args
+      );
+    }).length;
+
+    if (identicalCalls >= IDENTICAL_CALL_LIMIT) {
+      dispatch(
+        updateToolCallOutput({
+          toolCallId,
+          contextItems: [
+            {
+              icon: "problems",
+              name: "Repeated Tool Call",
+              description: "Tool Call Blocked",
+              content: `${toolName} has already been called ${identicalCalls} times with exactly these arguments, so calling it again cannot produce a different result. Do not repeat it. Change the arguments, use a different tool, or - if you already have what you need - give the user your answer. If you are genuinely stuck, explain what you tried and stop.`,
+              hidden: false,
+            },
+          ],
+        }),
+      );
+      dispatch(errorToolCall({ toolCallId }));
+      unwrapResult(await dispatch(streamResponseAfterToolCall({ toolCallId })));
+      return;
+    }
 
     dispatch(
       setToolCallCalling({
@@ -52,7 +102,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
     // Should not be caught here - should be handled as normal stream errors
     if (
       CLIENT_TOOLS.find(
-        (toolName) => toolName === toolCallState.toolCall.function.name,
+        (clientToolName) => clientToolName === toolName,
       )
     ) {
       // Tool is called on client side
@@ -95,7 +145,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
               icon: "problems",
               name: "Tool Call Error",
               description: "Tool Call Failed",
-              content: `${toolCallState.toolCall.function.name} failed with the message: ${errorMessage}\n\nPlease try something else or request further instructions.`,
+              content: `${toolName} failed with the message: ${errorMessage}\n\nDo not stop to ask the user. If this message suggests a concrete fix, apply it and retry immediately; otherwise use the list or glob tools to find the correct input. Ask the user only after you have actually tried and are still stuck.`,
               hidden: false,
             },
           ],

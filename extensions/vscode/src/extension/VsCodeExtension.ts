@@ -158,11 +158,14 @@ export class VsCodeExtension {
         } else if (newConfig) {
           setupStatusBar(undefined, undefined, false);
 
-          registerAllCodeLensProviders(
+          const { verticalDiffCodeLens } = registerAllCodeLensProviders(
             context,
             this.verticalDiffManager.fileUriToCodeLens,
             newConfig,
           );
+
+          this.verticalDiffManager.refreshCodeLens =
+            verticalDiffCodeLens.refresh.bind(verticalDiffCodeLens);
         }
       },
     );

@@ -408,7 +408,10 @@ jobs:
           cd core
           npm test
         env:
-          IGNORE_API_KEY_TESTS: ${{ github.event.pull_request.head.repo.fork == true || github.actor == 'dependabot[bot]' }}
+          # A direct push has no pull_request context, so the old fork check
+          # evaluated false here and ran the paid-API tests with no keys. Skip
+          # them whenever the secrets simply are not there.
+          IGNORE_API_KEY_TESTS: ${{ secrets.OPENAI_API_KEY == '' || secrets.ANTHROPIC_API_KEY == '' }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -651,7 +654,9 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
           echo -e "Host ssh-test-container\n\tHostName $SSH_HOST\n\tUser ec2-user\n\tIdentityFile ~/.ssh/id_rsa" >> ~/.ssh/config
-        if: ${{ github.event.pull_request.head.repo.fork == false && github.actor != 'dependabot[bot]' }}
+        # On a direct push there is no pull_request context, so the old fork
+        # check let this run with empty secrets and ssh-keyscan failed the job.
+        if: ${{ env.SSH_KEY != '' && env.SSH_HOST != '' }}
 
       - name: Set up Xvfb
         run: |
@@ -661,7 +666,7 @@ jobs:
       - name: Run e2e tests
         run: |
           cd extensions/vscode
-          IGNORE_SSH_TESTS="${{ github.event.pull_request.head.repo.fork == true || github.actor == 'dependabot[bot]' }}" TEST_FILE="${{ matrix.test_file }}" npm run ${{ matrix.command }}
+          IGNORE_SSH_TESTS="${{ secrets.GH_ACTIONS_SSH_TEST_KEY_PEM == '' }}" TEST_FILE="${{ matrix.test_file }}" npm run ${{ matrix.command }}
         env:
           DISPLAY: :99
 

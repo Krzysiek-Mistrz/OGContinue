@@ -88,8 +88,8 @@
       "properties": {
         "continue.telemetryEnabled": {
           "type": "boolean",
-          "default": true,
-          "markdownDescription": "Continue collects anonymous usage data, cleaned of PII, to help us improve the product for our users. Read more  at [continue.dev › Telemetry](https://docs.continue.dev/telemetry)."
+          "default": false,
+          "markdownDescription": "Send anonymous usage data. OGContinue has no telemetry backend of its own, so this is off by default and only has an effect if you configure your own remote config server."
         },
         "continue.showInlineTip": {
           "type": "boolean",
@@ -553,7 +553,7 @@
         {
           "type": "webview",
           "id": "continue.continueGUIView",
-          "name": "Continue",
+          "name": "OGContinue",
           "icon": "media/sidebar-icon.png",
           "visibility": "visible"
         }
@@ -562,7 +562,7 @@
         {
           "type": "webview",
           "id": "continue.continueConsoleView",
-          "name": "Continue Console",
+          "name": "OGContinue Console",
           "icon": "$(window)",
           "visibility": "visible",
           "when": "config.continue.enableConsole"

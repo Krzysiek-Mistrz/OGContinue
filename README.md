@@ -27,25 +27,37 @@
 
 ## Chat
 
-Chat makes it easy to ask for help from an LLM without needing to leave the IDE.
+Ask questions about your code, get explanations, or brainstorm — without leaving the IDE.
 
 ## Autocomplete
 
-Autocomplete provides inline code suggestions as you type.
+Inline code suggestions as you type, powered by a local autocomplete model.
 
 ## Edit
 
-Edit is a convenient way to modify code without leaving your current file.
+Modify code in place, right in your current file, without switching to chat.
 
 ## Agent
 
-Agent enables you to make more substantial changes to your codebase.
+Let the model use tools (read files, run commands, apply edits) to make larger changes across your codebase.
 
 </div>
 
+## How the modes work together
+
+Everything happens inside one continuous session — there's no separate "start a new chat" step for each mode:
+
+- **`Ctrl+L`** — adds the current context (selection/file) to your **active session** and switches it to **Chat** mode. If no session is open yet, it starts one.
+- **`Ctrl+I`** — adds the current context to your **active session** and switches it to **Edit** mode, so the model edits the file in place instead of just replying in chat. If no session is open yet, it starts one.
+- **Agent** is a manual toggle inside the session — turn it on when you want the model to use tools (read files, run terminal commands, apply multi-file edits) instead of just chatting or doing a single edit.
+
+In short: `Ctrl+L`/`Ctrl+I` never throw away your current conversation — they just switch what the *next* message does with it. A brand-new session only starts if you don't already have one open.
+
 ## Getting Started
 
-OGContinue is built from the upstream Continue codebase, so most general usage docs at [continue.dev/docs](https://continue.dev/docs) still apply. For local-only setup (recommended Ollama models, RAG config, Agent mode), see [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) in this repo.
+OGContinue is built from the upstream Continue codebase, so most general usage docs at [continue.dev/docs](https://continue.dev/docs) still apply.
+
+**To run it fully locally (recommended):** install [Ollama](https://ollama.com), pull a model, and paste a ready-to-use `config.yaml` — see [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) for copy-paste instructions (Ollama install, model picks, local `config.yaml` for chat/autocomplete/embed, and an optional example for BYO-API-key cloud models — Anthropic/OpenAI/Google — if you'd rather use those instead of local models).
 
 ## Contributing
 

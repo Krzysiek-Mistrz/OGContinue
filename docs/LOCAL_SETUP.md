@@ -36,7 +36,7 @@ On a 6 GB card such as an RTX 3060 Mobile, `qwen2.5-coder:1.5b-base-q8_0` runs a
 
 Agent mode isn't a separate role — it's enabled automatically once a model with tool-calling support is assigned the `chat` role. Embeddings for RAG/codebase search are just another model entry with the `embed` role, not a separate top-level key.
 
-4 local models config:
+3 local models config:
 ```yaml
 name: Local Assistant
 version: 1.0.0
@@ -51,6 +51,12 @@ models:
       - chat
       - edit
       - apply
+
+  - name: Qwen2.5 Coder 1.5B Base (local)
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base-q8_0
+    roles:
+      - autocomplete
 
   - name: Nomic Embed (local)
     provider: ollama

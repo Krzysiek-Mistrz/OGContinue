@@ -15,18 +15,133 @@ import { BaseLLM } from "../index.js";
 import { streamResponse } from "../stream.js";
 
 /**
+ * Small models frequently produce a tool-call-shaped object that isn't
+ * strictly valid JSON: multi-line code embedded with raw, unescaped
+ * newlines, or Python-style triple-quoted strings (`"""..."""`) instead of a
+ * properly escaped JSON string. This walks the candidate text and rewrites
+ * every double-quoted (or triple-double-quoted) string span into a
+ * correctly escaped JSON string, so the result can be parsed by
+ * `JSON.parse`. Braces/structure outside of string spans are left untouched.
+ */
+function repairPseudoJsonCandidate(candidate: string): string {
+  let out = "";
+  let i = 0;
+  let mode: "outside" | "string" | "triple" = "outside";
+
+  while (i < candidate.length) {
+    const ch = candidate[i];
+
+    if (mode === "outside") {
+      if (candidate.startsWith('"""', i)) {
+        out += '"';
+        mode = "triple";
+        i += 3;
+      } else if (ch === '"') {
+        out += '"';
+        mode = "string";
+        i += 1;
+      } else {
+        out += ch;
+        i += 1;
+      }
+      continue;
+    }
+
+    if (mode === "string") {
+      if (ch === "\\" && i + 1 < candidate.length) {
+        out += ch + candidate[i + 1];
+        i += 2;
+      } else if (ch === '"') {
+        out += '"';
+        mode = "outside";
+        i += 1;
+      } else if (ch === "\n") {
+        out += "\\n";
+        i += 1;
+      } else if (ch === "\r") {
+        out += "\\r";
+        i += 1;
+      } else if (ch === "\t") {
+        out += "\\t";
+        i += 1;
+      } else {
+        out += ch;
+        i += 1;
+      }
+      continue;
+    }
+
+    // mode === "triple"
+    if (candidate.startsWith('"""', i)) {
+      out += '"';
+      mode = "outside";
+      i += 3;
+    } else if (ch === '"') {
+      out += '\\"';
+      i += 1;
+    } else if (ch === "\\") {
+      out += "\\\\";
+      i += 1;
+    } else if (ch === "\n") {
+      out += "\\n";
+      i += 1;
+    } else if (ch === "\r") {
+      out += "\\r";
+      i += 1;
+    } else if (ch === "\t") {
+      out += "\\t";
+      i += 1;
+    } else {
+      out += ch;
+      i += 1;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Finds where text should stop being streamed to the user because it may be
+ * the beginning of a tool call printed as plain JSON. Returns the index of
+ * that point, including an opening code fence when the object is wrapped in
+ * one, or -1 when nothing needs to be held back.
+ */
+function findToolCallTextStart(text: string): number {
+  const braceIndex = text.indexOf("{");
+  // A fence arriving before the opening brace must be held back too,
+  // otherwise it is streamed out and left orphaned once the tool call it
+  // wraps is lifted out of the text.
+  const searchArea = braceIndex === -1 ? text : text.slice(0, braceIndex);
+  const fenceMatch = searchArea.match(/```[a-zA-Z]*\s*$/);
+
+  if (fenceMatch?.index !== undefined) {
+    return fenceMatch.index;
+  }
+  return braceIndex;
+}
+
+/**
+ * Removes code fences left empty after a tool call was lifted out of them.
+ */
+function stripEmptyCodeFences(text: string): string {
+  return text.replace(/```[a-zA-Z]*\s*```/g, "").trim();
+}
+
+/**
  * Small/quantized models sometimes fail to trigger Ollama's native tool-call
  * parsing (which depends on the model's own chat template recognizing a
  * specific token sequence) and instead just print a tool-call-shaped JSON
  * object as ordinary text. This scans a message's text content for a
  * balanced `{ ... }` object whose "name" matches one of the tools we
  * actually offered, so we can still recover and execute the call instead of
- * silently showing raw JSON in the chat.
+ * silently showing raw JSON in the chat. An object left unclosed because the
+ * response was cut short is closed first, as long as the cut did not land
+ * inside a string value.
  *
  * Returns the recovered call plus the surrounding text with the JSON
  * stripped out, or null if nothing matching was found.
  */
-function tryRecoverToolCallFromText(
+export function tryRecoverToolCallFromText(
   content: string,
   validToolNames: string[],
 ): { name: string; args: unknown; remainingText: string } | null {
@@ -69,27 +184,46 @@ function tryRecoverToolCallFromText(
       }
     }
 
+    let candidate: string;
+    let consumedTo: number;
+
     if (end === -1) {
-      continue;
+      // The response was cut off before the object closed. Close it only when
+      // the cut landed outside a string, so a half-written argument value is
+      // never silently completed into content the model did not produce.
+      if (inString || depth === 0) {
+        continue;
+      }
+      candidate =
+        content.slice(i).trimEnd().replace(/,$/, "") + "}".repeat(depth);
+      consumedTo = content.length;
+    } else {
+      candidate = content.slice(i, end + 1);
+      consumedTo = end + 1;
     }
 
-    const candidate = content.slice(i, end + 1);
+    let parsed: any;
     try {
-      const parsed = JSON.parse(candidate);
-      if (
-        parsed &&
-        typeof parsed.name === "string" &&
-        validToolNames.includes(parsed.name) &&
-        typeof parsed.arguments === "object" &&
-        parsed.arguments !== null
-      ) {
-        const remainingText = (
-          content.slice(0, i) + content.slice(end + 1)
-        ).trim();
-        return { name: parsed.name, args: parsed.arguments, remainingText };
-      }
+      parsed = JSON.parse(candidate);
     } catch {
-      // Not valid JSON at this position — keep scanning.
+      try {
+        parsed = JSON.parse(repairPseudoJsonCandidate(candidate));
+      } catch {
+        // Not recoverable as JSON at this position — keep scanning.
+      }
+    }
+
+    if (
+      parsed &&
+      typeof parsed.name === "string" &&
+      validToolNames.includes(parsed.name) &&
+      typeof parsed.arguments === "object" &&
+      parsed.arguments !== null
+    ) {
+      const remainingText = (
+        content.slice(0, i) + content.slice(consumedTo)
+      ).trim();
+      return { name: parsed.name, args: parsed.arguments, remainingText };
     }
   }
 
@@ -389,6 +523,32 @@ class Ollama extends BaseLLM implements ModelInstaller {
       }
     }
 
+    // Tool calls must be sent back with the assistant turn that made them.
+    // Without them the model sees a tool result appear out of nowhere, and
+    // the chat template loses track of the conversation.
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      const toolCalls = message.toolCalls
+        .filter((toolCall) => toolCall.function?.name)
+        .map((toolCall) => {
+          let args: JSONSchema7Object = {};
+          try {
+            args = JSON.parse(toolCall.function?.arguments || "{}");
+          } catch {
+            // Keep the call itself; malformed args are better than a gap.
+          }
+          return {
+            function: {
+              name: toolCall.function!.name!,
+              arguments: args,
+            },
+          };
+        });
+
+      if (toolCalls.length > 0) {
+        ollamaMessage.tool_calls = toolCalls;
+      }
+    }
+
     return ollamaMessage;
   }
 
@@ -502,6 +662,54 @@ class Ollama extends BaseLLM implements ModelInstaller {
       signal,
     });
 
+    const validToolNames =
+      options.tools?.map((tool) => tool.function.name) ?? [];
+
+    /**
+     * Emits a recovered call as leading text followed by a tool-call-only
+     * message. They must stay separate: a single message carrying both is
+     * folded into the previous one as plain content and its tool call is
+     * dropped, because a native tool call never arrives with text attached.
+     */
+    function* emitRecoveredToolCall(recovered: {
+      name: string;
+      args: unknown;
+      remainingText: string;
+    }): Generator<ChatMessage> {
+      // A message carries a single tool call, and the agent is told to work
+      // one at a time. Models sometimes print several at once, so drop the
+      // extras rather than leaking them into the chat as raw JSON; the model
+      // asks again once it sees the first result.
+      let remainingText = recovered.remainingText;
+      for (
+        let extra = tryRecoverToolCallFromText(remainingText, validToolNames);
+        extra !== null;
+        extra = tryRecoverToolCallFromText(remainingText, validToolNames)
+      ) {
+        remainingText = extra.remainingText;
+      }
+
+      const leadingText = stripEmptyCodeFences(remainingText);
+      if (leadingText) {
+        yield { role: "assistant", content: leadingText };
+      }
+
+      yield {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            type: "function",
+            id: `tc_${uuidv4()}`,
+            function: {
+              name: recovered.name,
+              arguments: JSON.stringify(recovered.args),
+            },
+          },
+        ],
+      };
+    }
+
     function convertChatMessage(res: OllamaChatResponse): ChatMessage {
       if ("error" in res) {
         throw new Error(res.error);
@@ -527,28 +735,6 @@ class Ollama extends BaseLLM implements ModelInstaller {
               arguments: JSON.stringify(tc.function.arguments),
             },
           }));
-        } else if (options.tools?.length) {
-          // Some models (especially smaller/quantized ones) fail to trigger
-          // Ollama's own template-based tool-call parsing and instead print
-          // the call as plain JSON text. Try to recover it rather than just
-          // showing raw JSON in the chat.
-          const recovered = tryRecoverToolCallFromText(
-            res.message.content,
-            options.tools.map((tool) => tool.function.name),
-          );
-          if (recovered) {
-            chatMessage.content = recovered.remainingText;
-            chatMessage.toolCalls = [
-              {
-                type: "function",
-                id: `tc_${uuidv4()}`,
-                function: {
-                  name: recovered.name,
-                  arguments: JSON.stringify(recovered.args),
-                },
-              },
-            ];
-          }
         }
         return chatMessage;
       } else {
@@ -561,9 +747,33 @@ class Ollama extends BaseLLM implements ModelInstaller {
 
     if (chatOptions.stream === false) {
       const json = (await response.json()) as OllamaChatResponse;
-      yield convertChatMessage(json);
+      const message = convertChatMessage(json);
+
+      // Small models often print the call as plain JSON text instead of
+      // triggering Ollama's own template-based tool-call parsing.
+      if (
+        message.role === "assistant" &&
+        !message.toolCalls?.length &&
+        validToolNames.length
+      ) {
+        const recovered = tryRecoverToolCallFromText(
+          renderChatMessage(message),
+          validToolNames,
+        );
+        if (recovered) {
+          yield* emitRecoveredToolCall(recovered);
+          return;
+        }
+      }
+
+      yield message;
     } else {
       let buffer = "";
+      // Text held back because it may turn out to be a tool call printed as
+      // plain JSON. A streamed chunk only carries a few characters, so a
+      // tool-call object can only be recognized once the stream has finished.
+      let withheldText = "";
+
       for await (const value of streamResponse(response)) {
         // Append the received chunk to the buffer
         buffer += value;
@@ -573,15 +783,56 @@ class Ollama extends BaseLLM implements ModelInstaller {
 
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
-          if (chunk.trim() !== "") {
-            try {
-              const j = JSON.parse(chunk) as OllamaChatResponse;
-              const chatMessage = convertChatMessage(j);
-              yield chatMessage;
-            } catch (e) {
-              throw new Error(`Error parsing Ollama response: ${e} ${chunk}`);
-            }
+          if (chunk.trim() === "") {
+            continue;
           }
+
+          let j: OllamaChatResponse;
+          try {
+            j = JSON.parse(chunk) as OllamaChatResponse;
+          } catch (e) {
+            throw new Error(`Error parsing Ollama response: ${e} ${chunk}`);
+          }
+
+          const chatMessage = convertChatMessage(j);
+
+          const hasStructuredToolCall =
+            chatMessage.role === "assistant" &&
+            !!chatMessage.toolCalls?.length;
+
+          if (!validToolNames.length || hasStructuredToolCall) {
+            if (withheldText) {
+              yield { role: "assistant", content: withheldText };
+              withheldText = "";
+            }
+            yield chatMessage;
+            continue;
+          }
+
+          withheldText += renderChatMessage(chatMessage);
+          const holdFrom = findToolCallTextStart(withheldText);
+          if (holdFrom === -1) {
+            yield { role: "assistant", content: withheldText };
+            withheldText = "";
+          } else if (holdFrom > 0) {
+            yield {
+              role: "assistant",
+              content: withheldText.slice(0, holdFrom),
+            };
+            withheldText = withheldText.slice(holdFrom);
+          }
+        }
+      }
+
+      if (withheldText) {
+        const recovered = tryRecoverToolCallFromText(
+          withheldText,
+          validToolNames,
+        );
+        if (recovered) {
+          yield* emitRecoveredToolCall(recovered);
+        } else {
+          yield { role: "assistant", content: withheldText };
         }
       }
     }

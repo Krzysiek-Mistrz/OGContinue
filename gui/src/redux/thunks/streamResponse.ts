@@ -12,6 +12,7 @@ import {
 } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
 import { gatherContext } from "./gatherContext";
+import { nudgeStalledAgent } from "./nudgeStalledAgent";
 import { resetStateForNewMessage } from "./resetStateForNewMessage";
 import { streamNormalInput } from "./streamNormalInput";
 import { streamThunkWrapper } from "./streamThunkWrapper";
@@ -110,6 +111,9 @@ export const streamResponseThunk = createAsyncThunk<
           });
         }
 
+        const historyLengthBeforeStream =
+          getState().session.history.length;
+
         unwrapResult(
           await dispatch(
             streamNormalInput({
@@ -126,6 +130,13 @@ export const streamResponseThunk = createAsyncThunk<
             }),
           ),
         );
+
+        await nudgeStalledAgent({
+          dispatch,
+          getState,
+          historyLengthBeforeStream,
+          rules: state.config.config.rules,
+        });
       }),
     );
   },

@@ -145,6 +145,14 @@ function getLanguageFromClassName(className: any): string | null {
   return language ?? null;
 }
 
+/**
+ * Distinguishes a code fence info string that is really a file path
+ * ("src/main.py") from a plain language name ("python").
+ */
+function hasFileExtension(value: unknown): value is string {
+  return typeof value === "string" && /\.[0-9a-z]+$/i.test(value);
+}
+
 function getCodeChildrenContent(children: any) {
   if (typeof children === "string") {
     return children;
@@ -220,6 +228,14 @@ const StyledMarkdownPreview = memo(function StyledMarkdownPreview(
         const lastCodeNode = lastNode.type === "code" ? lastNode : null;
 
         visit(tree, "code", (node: any) => {
+          // The documented form is "```language path", which puts the path in
+          // node.meta. Models very often write "```path" instead, and then the
+          // whole path is parsed as the language and the file would be lost.
+          const metaParts = node.meta ? node.meta.split(" ") : [];
+          const relativeFilepath =
+            metaParts[0] ??
+            (hasFileExtension(node.lang) ? node.lang : undefined);
+
           if (!node.lang) {
             node.lang = "";
           } else if (node.lang.includes(".")) {
@@ -232,10 +248,11 @@ const StyledMarkdownPreview = memo(function StyledMarkdownPreview(
           node.data.hProperties["data-islastcodeblock"] = lastCodeNode === node;
           node.data.hProperties["data-codeblockcontent"] = node.value;
 
-          if (node.meta) {
-            let meta = node.meta.split(" ");
-            node.data.hProperties["data-relativefilepath"] = meta[0];
-            node.data.hProperties.range = meta[1];
+          if (relativeFilepath) {
+            node.data.hProperties["data-relativefilepath"] = relativeFilepath;
+          }
+          if (metaParts[1]) {
+            node.data.hProperties.range = metaParts[1];
           }
         });
       },

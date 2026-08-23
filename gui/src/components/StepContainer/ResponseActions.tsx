@@ -1,4 +1,8 @@
-import { BarsArrowDownIcon, TrashIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathIcon,
+  BarsArrowDownIcon,
+  TrashIcon,
+} from "@heroicons/react/24/outline";
 import { ChatHistoryItem } from "core";
 import { renderChatMessage } from "core/util/messageContent";
 import FeedbackButtons from "../FeedbackButtons";
@@ -13,6 +17,7 @@ export interface ResponseActionsProps {
   item: ChatHistoryItem;
   isLast?: boolean;
   fullHistory?: ChatHistoryItem[];
+  onRetry?: () => void;
 }
 
 export default function ResponseActions({
@@ -23,6 +28,7 @@ export default function ResponseActions({
   onDelete,
   isLast,
   fullHistory,
+  onRetry,
 }: ResponseActionsProps) {
   return (
     <div className="mx-2 flex cursor-default items-center justify-end space-x-1 bg-transparent pb-0 text-xs text-gray-400">
@@ -33,6 +39,17 @@ export default function ResponseActions({
           onClick={onContinueGeneration}
         >
           <BarsArrowDownIcon className="h-3.5 w-3.5 text-gray-500" />
+        </HeaderButtonWithToolTip>
+      )}
+
+      {onRetry && (
+        <HeaderButtonWithToolTip
+          testId={`retry-button-${index}`}
+          text="Retry"
+          tabIndex={-1}
+          onClick={onRetry}
+        >
+          <ArrowPathIcon className="h-3.5 w-3.5 text-gray-500" />
         </HeaderButtonWithToolTip>
       )}
 

@@ -1,12 +1,12 @@
 import { ChatHistoryItem } from "core";
 import { renderChatMessage, stripImages } from "core/util/messageContent";
 import { useEffect, useState } from "react";
-import { useDispatch } from "react-redux";
 import styled from "styled-components";
 import { vscBackground } from "..";
-import { useAppSelector } from "../../redux/hooks";
+import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { selectUIConfig } from "../../redux/slices/configSlice";
 import { deleteMessage } from "../../redux/slices/sessionSlice";
+import { streamResponseThunk } from "../../redux/thunks/streamResponse";
 import { getFontSize } from "../../util";
 import StyledMarkdownPreview from "../StyledMarkdownPreview";
 import Reasoning from "./Reasoning";
@@ -30,7 +30,7 @@ const ContentDiv = styled.div<{ fontSize?: number }>`
 `;
 
 export default function StepContainer(props: StepContainerProps) {
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const [isTruncated, setIsTruncated] = useState(false);
   const isStreaming = useAppSelector((state) => state.session.isStreaming);
   const historyItemAfterThis = useAppSelector(
@@ -66,6 +66,33 @@ export default function StepContainer(props: StepContainerProps) {
 
   function onDelete() {
     dispatch(deleteMessage(props.index));
+  }
+
+  // An agent turn puts tool calls and their results between the user's
+  // message and this response, so walk back to the message that started it.
+  // Resubmitting at that index truncates everything after and streams again.
+  const retryFromIndex = (() => {
+    for (let i = props.index - 1; i >= 0; i--) {
+      const candidate = fullHistory[i];
+      if (candidate?.message.role === "user" && candidate.editorState) {
+        return i;
+      }
+    }
+    return -1;
+  })();
+  const canRetry = !isStreaming && retryFromIndex !== -1;
+
+  function onRetry() {
+    if (!canRetry) {
+      return;
+    }
+    dispatch(
+      streamResponseThunk({
+        editorState: fullHistory[retryFromIndex].editorState!,
+        modifiers: { useCodebase: false, noContext: false },
+        index: retryFromIndex,
+      }),
+    );
   }
 
   function onContinueGeneration() {
@@ -115,6 +142,7 @@ export default function StepContainer(props: StepContainerProps) {
               item={props.item}
               isLast={props.isLast}
               fullHistory={fullHistory}
+              onRetry={canRetry ? onRetry : undefined}
             />
           )}
         </div>

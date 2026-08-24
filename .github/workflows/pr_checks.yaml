@@ -787,7 +787,6 @@ jobs:
       - vscode-get-test-file-matrix
       - vscode-package-extension
       - vscode-download-e2e-dependencies
-      - vscode-e2e-tests
       - gui-tests
       - config-yaml-checks
       - install-config-yaml

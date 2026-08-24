@@ -29,25 +29,25 @@
 
 Ask questions about your code, get explanations, or brainstorm — without leaving the IDE.
 
-<img src="./media/chat.png" alt="Chat mode" width="800" />
+<img src="./extensions/vscode/media/chat.png" alt="Chat mode" width="800" />
 
 ## Autocomplete
 
 Inline code suggestions as you type, powered by a local autocomplete model.
 
-<img src="./media/autocomplete.png" alt="Autocomplete" width="800" />
+<img src="./extensions/vscode/media/autocomplete.png" alt="Autocomplete" width="800" />
 
 ## Edit
 
 Modify code in place, right in your current file, without switching to chat.
 
-<img src="./media/edit.png" alt="Edit mode" width="800" />
+<img src="./extensions/vscode/media/edit.png" alt="Edit mode" width="800" />
 
 ## Agent
 
 Let the model use tools (read files, run commands, apply edits) to make larger changes across your codebase.
 
-<img src="./media/agent.png" alt="Agent mode" width="800" />
+<img src="./extensions/vscode/media/agent.png" alt="Agent mode" width="800" />
 
 </div>
 

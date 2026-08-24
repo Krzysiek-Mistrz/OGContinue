@@ -23,17 +23,25 @@
 
 Chat makes it easy to ask for help from an LLM without needing to leave the IDE.
 
+<img src="./media/chat.png" alt="Chat mode" width="800" />
+
 ## Autocomplete
 
 Autocomplete provides inline code suggestions as you type.
+
+<img src="./media/autocomplete.png" alt="Autocomplete" width="800" />
 
 ## Edit
 
 Edit is a convenient way to modify code without leaving your current file.
 
+<img src="./media/edit.png" alt="Edit mode" width="800" />
+
 ## Agent
 
 Agent enables you to make more substantial changes to your codebase.
+
+<img src="./media/agent.png" alt="Agent mode" width="800" />
 
 </div>
 

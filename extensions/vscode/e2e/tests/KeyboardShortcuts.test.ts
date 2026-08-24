@@ -168,8 +168,10 @@ describe("Keyboard Shortcuts", () => {
 
     await TestUtils.waitForTimeout(DEFAULT_TIMEOUT.XS);
 
+    // One message was already sent above, so index 0 is now that message's
+    // own (historical) input box, not the live one
     const textInput = await TestUtils.waitForSuccess(() =>
-      GUISelectors.getMessageInputFieldAtIndex(view, 0),
+      GUISelectors.getMessageInputFieldAtIndex(view, 1),
     );
     const activeElement: WebElement = await driver.switchTo().activeElement();
     const textInputHtml = await textInput.getAttribute("outerHTML");

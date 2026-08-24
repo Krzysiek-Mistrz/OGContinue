@@ -101,6 +101,14 @@ describe("Keyboard Shortcuts", () => {
       until.elementTextIs(chatInput, "HELLO WORLD HELLO CONTINUE"),
       DEFAULT_TIMEOUT.SM,
     );
+
+    // This test only exercises undo/redo and never submits the message, so
+    // the typed text is left sitting in the input. Clear it so later tests
+    // in this file - which assume a fresh input and use sendKeys, which
+    // appends rather than replacing - don't inherit it.
+    await chatInput.sendKeys(TestUtils.osControlKey + "a");
+    await chatInput.sendKeys(Key.BACK_SPACE);
+    await driver.wait(until.elementTextIs(chatInput, ""), DEFAULT_TIMEOUT.SM);
   }).timeout(DEFAULT_TIMEOUT.XL);
 
   it("Should not create a code block when Cmd+L is pressed without text highlighted", async () => {

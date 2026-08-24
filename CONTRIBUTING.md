@@ -57,6 +57,8 @@ You should have Node.js version 20.19.0 (LTS) or higher installed. You can get i
 nvm use
 ```
 
+VS Code `^1.67.0` is required — `@types/vscode` is pinned to `1.67.0` since that's the earliest version that doesn't break APIs this extension uses (going back to `1.66.0` breaks `vscode.window.tabGroups`).
+
 #### Fork the Repository
 
 1. Fork [Krzysiek-Mistrz/OGContinue](https://github.com/Krzysiek-Mistrz/OGContinue) to your own GitHub account.
@@ -72,7 +74,7 @@ nvm use
    2. Select `Launch extension` from the dropdown.
    3. Hit play.
    4. This opens a new VS Code window with the extension installed (the _Host VS Code_), separate from the window you're debugging from (the _Main VS Code_).
-3. To package the extension: run `npm run package` in `extensions/vscode`, or select `Tasks: Run Task` then `vscode-extension:package`. This generates `extensions/vscode/build/ogcontinue-{VERSION}.vsix`, installable by right-clicking and selecting "Install Extension VSIX".
+3. To package the extension: run `npm run package` in `extensions/vscode`, or select `Tasks: Run Task` then `vscode-extension:package`. This generates `extensions/vscode/build/ogcontinue-{VERSION}.vsix`, installable by right-clicking and selecting "Install Extension VSIX". See [extensions/vscode/vsc-extension-quickstart.md](./extensions/vscode/vsc-extension-quickstart.md) for the full build/run/package flow, including why plain `vsce package` fails in this monorepo.
 
 **Breakpoints** work in both `core` and `extensions/vscode` while debugging, but are not currently supported inside `gui` code.
 

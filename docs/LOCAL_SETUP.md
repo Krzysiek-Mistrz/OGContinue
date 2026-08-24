@@ -32,6 +32,14 @@ On a 6 GB card such as an RTX 3060 Mobile, `qwen2.5-coder:1.5b-base-q8_0` runs a
       - autocomplete
 ```
 
+### If autocomplete doesn't trigger
+
+Autocomplete is controlled by the OGContinue status bar item in the bottom-right
+of the VS Code window. If suggestions aren't appearing even though a model is
+configured for the `autocomplete` role, click it and toggle **Disable
+Autocomplete** then **Enable Autocomplete** — this forces it to re-read the
+current config and reliably fixes it.
+
 ## Example `config.yaml`
 
 Agent mode isn't a separate role — it's enabled automatically once a model with tool-calling support is assigned the `chat` role. Embeddings for RAG/codebase search are just another model entry with the `embed` role, not a separate top-level key.

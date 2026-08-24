@@ -29,17 +29,25 @@
 
 Ask questions about your code, get explanations, or brainstorm — without leaving the IDE.
 
+<img src="./media/chat.png" alt="Chat mode" width="800" />
+
 ## Autocomplete
 
 Inline code suggestions as you type, powered by a local autocomplete model.
+
+<img src="./media/autocomplete.png" alt="Autocomplete" width="800" />
 
 ## Edit
 
 Modify code in place, right in your current file, without switching to chat.
 
+<img src="./media/edit.png" alt="Edit mode" width="800" />
+
 ## Agent
 
 Let the model use tools (read files, run commands, apply edits) to make larger changes across your codebase.
+
+<img src="./media/agent.png" alt="Agent mode" width="800" />
 
 </div>
 
@@ -59,9 +67,11 @@ OGContinue is built from the upstream Continue codebase, so most general usage d
 
 **To run it fully locally (recommended):** install [Ollama](https://ollama.com), pull a model, and paste a ready-to-use `config.yaml` — see [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md) for copy-paste instructions (Ollama install, model picks, local `config.yaml` for chat/autocomplete/embed, and an optional example for BYO-API-key cloud models — Anthropic/OpenAI/Google — if you'd rather use those instead of local models).
 
+**Building from source / installing your own build:** see [extensions/vscode/vsc-extension-quickstart.md](./extensions/vscode/vsc-extension-quickstart.md).
+
 ## Contributing
 
-This is a small community fork — issues and PRs are welcome on [this repository](https://github.com/Krzysiek-Mistrz/OGContinue). For contributing to upstream Continue itself, see the [original project](https://github.com/continuedev/continue).
+This is a small community fork — issues and PRs are welcome on [this repository](https://github.com/Krzysiek-Mistrz/OGContinue). See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development setup. For contributing to upstream Continue itself, see the [original project](https://github.com/continuedev/continue).
 
 ## License
 

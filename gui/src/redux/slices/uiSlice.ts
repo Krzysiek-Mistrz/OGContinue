@@ -5,8 +5,6 @@ import {
   defaultOnboardingCardState,
   OnboardingCardState,
 } from "../../components/OnboardingCard";
-import { getLocalStorage, LocalStorageKey } from "../../util/localStorage";
-
 export type ToolPolicy =
   | "allowedWithPermission"
   | "allowedWithoutPermission"
@@ -22,8 +20,6 @@ type UIState = {
   dialogMessage: string | JSX.Element | undefined;
   dialogEntryOn: boolean;
   onboardingCard: OnboardingCardState;
-  isExploreDialogOpen: boolean;
-  hasDismissedExploreDialog: boolean;
   shouldAddFileForEditing: boolean;
   toolSettings: ToolPolicies;
   toolGroupSettings: ToolGroupPolicies;
@@ -39,10 +35,6 @@ export const uiSlice = createSlice({
     dialogMessage: "",
     dialogEntryOn: false,
     onboardingCard: defaultOnboardingCardState,
-    isExploreDialogOpen: getLocalStorage(LocalStorageKey.IsExploreDialogOpen),
-    hasDismissedExploreDialog: getLocalStorage(
-      LocalStorageKey.HasDismissedExploreDialog,
-    ),
     shouldAddFileForEditing: false,
     ttsActive: false,
     toolSettings: {
@@ -83,15 +75,6 @@ export const uiSlice = createSlice({
     },
     setShowDialog: (state, action: PayloadAction<UIState["showDialog"]>) => {
       state.showDialog = action.payload;
-    },
-    setIsExploreDialogOpen: (
-      state,
-      action: PayloadAction<UIState[LocalStorageKey.IsExploreDialogOpen]>,
-    ) => {
-      state.isExploreDialogOpen = action.payload;
-    },
-    setHasDismissedExploreDialog: (state, action: PayloadAction<boolean>) => {
-      state.hasDismissedExploreDialog = action.payload;
     },
     // Tools
     addTool: (state, action: PayloadAction<Tool>) => {
@@ -136,8 +119,6 @@ export const {
   setDialogMessage,
   setDialogEntryOn,
   setShowDialog,
-  setIsExploreDialogOpen,
-  setHasDismissedExploreDialog,
   toggleToolSetting,
   toggleToolGroupSetting,
   addTool,

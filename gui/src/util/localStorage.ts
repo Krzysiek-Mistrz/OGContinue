@@ -2,8 +2,6 @@ import { JSONContent } from "@tiptap/react";
 import { OnboardingStatus } from "../components/OnboardingCard";
 
 type LocalStorageTypes = {
-  isExploreDialogOpen: boolean;
-  hasDismissedExploreDialog: boolean;
   onboardingStatus?: OnboardingStatus;
   hasDismissedOnboardingCard: boolean;
   mainTextEntryCounter: number;
@@ -16,11 +14,6 @@ type LocalStorageTypes = {
   shownProfilesIntroduction: boolean;
   disableIndexing: boolean;
 };
-
-export enum LocalStorageKey {
-  IsExploreDialogOpen = "isExploreDialogOpen",
-  HasDismissedExploreDialog = "hasDismissedExploreDialog",
-}
 
 export function getLocalStorage<T extends keyof LocalStorageTypes>(
   key: T,

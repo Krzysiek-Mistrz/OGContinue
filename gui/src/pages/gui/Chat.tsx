@@ -61,7 +61,6 @@ import CodeToEditCard from "../../components/mainInput/CodeToEditCard";
 import EditModeDetails from "../../components/mainInput/EditModeDetails";
 import { getLocalStorage, setLocalStorage } from "../../util/localStorage";
 import { EmptyChatBody } from "./EmptyChatBody";
-import { ExploreDialogWatcher } from "./ExploreDialogWatcher";
 import { ToolCallDiv } from "./ToolCallDiv";
 import { useAutoScroll } from "./useAutoScroll";
 
@@ -127,9 +126,6 @@ export function Chat() {
   );
 
   const lastSessionId = useAppSelector((state) => state.session.lastSessionId);
-  const hasDismissedExploreDialog = useAppSelector(
-    (state) => state.ui.hasDismissedExploreDialog,
-  );
   const jetbrains = useMemo(() => {
     return isJetBrains();
   }, []);
@@ -434,7 +430,6 @@ export function Chat() {
               )}
             </div>
           </div>
-          {!hasDismissedExploreDialog && <ExploreDialogWatcher />}
           {history.length === 0 && (
             <EmptyChatBody showOnboardingCard={onboardingCard.show} />
           )}

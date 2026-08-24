@@ -95,7 +95,7 @@ This project uses [Prettier](https://marketplace.visualstudio.com/items?itemName
 
 ### Testing
 
-There's a mix of unit, functional, and e2e tests, run on each pull request. If a PR causes a test to fail, that needs to be resolved before merging. Please add or update tests to cover what you changed.
+There's a mix of unit and functional tests, run on each pull request. If a PR causes a test to fail, that needs to be resolved before merging. Please add or update tests to cover what you changed.
 
 ### Review Process
 

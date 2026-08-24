@@ -19,13 +19,32 @@ import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
  * going until the user stops them. The result cannot change, so refuse the call
  * once it has already been made twice and tell the model to do something else.
  *
- * Telling it is not enough on its own: a model already stuck in a loop tends to
- * answer the refusal with the very same call again, which would just bounce off
- * the guard forever. So the refusal buys a couple of chances to recover, and
- * past that the turn ends instead of streaming another response.
+ * A blocked call almost always means the model already made the change and
+ * just hasn't noticed - re-reading the file would show its own edit already
+ * applied. So every tier below keeps nudging the model to look again and move
+ * on, the same way a manual "Regenerate" reliably unstuck it in testing,
+ * rather than silently stopping and leaving the model's last word as another
+ * attempt at the same call. Only ABSOLUTE_MAX_TOOL_CALLS_PER_TURN - reserved
+ * for a model that ignores every nudge - actually ends the turn, purely to
+ * cap runaway token cost.
  */
 const IDENTICAL_CALL_LIMIT = 2;
-const IDENTICAL_CALL_HARD_LIMIT = 4;
+const IDENTICAL_CALL_STRONG_NUDGE_LIMIT = 4;
+
+/**
+ * The identical-call guard above only catches byte-identical repeats. In
+ * practice a small model asked to redo the same edit rarely reproduces it
+ * exactly - a comment worded slightly differently, different whitespace - so
+ * it drifts through a series of near-identical variants, each one dodging the
+ * identical-call counter by never repeating any single variant often enough
+ * to trip it. Observed live: "fix the type mismatch in text.py" cycling
+ * through edit_existing_file with subtly different `changes` text call after
+ * call. This is a second, argument-independent backstop: however varied the
+ * arguments, a turn that has made this many tool calls without reaching an
+ * answer is very likely stuck redoing work it already finished.
+ */
+const MAX_TOOL_CALLS_PER_TURN = 15;
+const ABSOLUTE_MAX_TOOL_CALLS_PER_TURN = 30;
 
 function canonicalizeArgs(args: unknown): string {
   return JSON.stringify(args, (_key, value) =>
@@ -35,6 +54,21 @@ function canonicalizeArgs(args: unknown): string {
         )
       : value,
   );
+}
+
+function countToolCallsSinceLastUserMessage(
+  history: ThunkApiType["state"]["session"]["history"],
+): number {
+  let count = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].message.role === "user") {
+      break;
+    }
+    if (history[i].toolCallState) {
+      count++;
+    }
+  }
+  return count;
 }
 
 export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
@@ -70,9 +104,22 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
         canonicalizeArgs(previous.parsedArgs) === args
       );
     }).length;
+    const turnToolCallCount = countToolCallsSinceLastUserMessage(
+      state.session.history,
+    );
 
-    if (identicalCalls >= IDENTICAL_CALL_LIMIT) {
-      const givingUp = identicalCalls >= IDENTICAL_CALL_HARD_LIMIT;
+    const overIdenticalLimit = identicalCalls >= IDENTICAL_CALL_LIMIT;
+    const overStrongNudgeLimit =
+      identicalCalls >= IDENTICAL_CALL_STRONG_NUDGE_LIMIT;
+    const overTurnBudget = turnToolCallCount >= MAX_TOOL_CALLS_PER_TURN;
+    const overAbsoluteLimit = turnToolCallCount >= ABSOLUTE_MAX_TOOL_CALLS_PER_TURN;
+
+    if (overIdenticalLimit || overTurnBudget) {
+      const content = overAbsoluteLimit
+        ? `This turn has made ${turnToolCallCount} tool calls without reaching an answer. Stopping here to cap runaway tool use. Explain what was tried and what's still unresolved.`
+        : overStrongNudgeLimit || overTurnBudget
+          ? `${toolName} was called again with the same or near-identical arguments. That almost always means the change is already applied - re-read the file to check before editing it again. If it's already correct, stop touching it and move on to the rest of the task, or tell the user you're done if nothing is left.`
+          : `${toolName} has already been called ${identicalCalls} times with exactly these arguments, so calling it again cannot produce a different result. Do not repeat it. Change the arguments, use a different tool, or - if you already have what you need - give the user your answer. If you are genuinely stuck, explain what you tried and stop.`;
       dispatch(
         updateToolCallOutput({
           toolCallId,
@@ -81,16 +128,14 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
               icon: "problems",
               name: "Repeated Tool Call",
               description: "Tool Call Blocked",
-              content: givingUp
-                ? `${toolName} was called ${identicalCalls} times with exactly these arguments and blocked each time. Stopping here so it does not loop indefinitely.`
-                : `${toolName} has already been called ${identicalCalls} times with exactly these arguments, so calling it again cannot produce a different result. Do not repeat it. Change the arguments, use a different tool, or - if you already have what you need - give the user your answer. If you are genuinely stuck, explain what you tried and stop.`,
+              content,
               hidden: false,
             },
           ],
         }),
       );
       dispatch(errorToolCall({ toolCallId }));
-      if (!givingUp) {
+      if (!overAbsoluteLimit) {
         unwrapResult(
           await dispatch(streamResponseAfterToolCall({ toolCallId })),
         );

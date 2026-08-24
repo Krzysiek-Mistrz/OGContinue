@@ -418,6 +418,10 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
           AZURE_FOUNDRY_API_KEY: ${{ secrets.AZURE_FOUNDRY_API_KEY }}
+          # Auto-minted per run, no setup needed. Read by the GitHub crawler
+          # test to avoid the unauthenticated API's shared, easily-exhausted
+          # 60/hr rate limit.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   package-tests:
     runs-on: ubuntu-latest
@@ -453,6 +457,7 @@ jobs:
 
       - name: Cache node modules
         uses: actions/cache@v3
+        id: vscode-cache
         with:
           path: extensions/vscode/node_modules
           key: ${{ runner.os }}-vscode-node-modules-${{ hashFiles('extensions/vscode/package-lock.json') }}
@@ -468,11 +473,27 @@ jobs:
           cd packages/config-yaml
           npm run build
 
+      # install-vscode (a dependency of this job) already ran npm ci under
+      # this exact cache key, so this normally restores a complete
+      # node_modules - including @vscode/ripgrep's downloaded binary - and
+      # npm ci below is skipped. That download hits api.github.com directly
+      # with no retry of its own, so running it again here on every job adds
+      # a second chance to lose to a transient GitHub 504 for no reason.
+      - name: Install vscode dependencies
+        if: steps.vscode-cache.outputs.cache-hit != 'true'
+        run: |
+          cd extensions/vscode
+          for attempt in 1 2 3; do
+            npm ci && exit 0
+            echo "npm ci failed (attempt $attempt/3), retrying in 10s..."
+            sleep 10
+          done
+          exit 1
+
       - name: Get test files
         id: vscode-get-test-file-matrix
         run: |
           cd extensions/vscode
-          npm ci
           npm run e2e:compile
           if [[ "${{ github.event.pull_request.head.repo.fork }}" == "true" || "${{ github.actor }}" == "dependabot[bot]" ]]; then
             # Exclude SSH tests for forks

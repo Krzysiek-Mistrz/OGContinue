@@ -20,7 +20,7 @@
   "displayName": "OGContinue - Local AI Code Assistant",
   "pricing": "Free",
   "description": "Community fork of Continue focused on fully local AI coding assistance. Unofficial, not affiliated with Continue Dev, Inc.",
-  "publisher": "Krzysiek-Mistrz",
+  "publisher": "ChrisEngineer",
   "engines": {
     "vscode": "^1.70.0",
     "node": ">=20.19.0"

@@ -61,7 +61,20 @@ describe("DocsCrawler", () => {
     let crawlerUsed: DocsCrawlerType;
 
     beforeAll(async () => {
-      docsCrawler = new DocsCrawler(mockIde, config, 5, 5, false);
+      // Unauthenticated requests to the GitHub REST API are capped at 60/hr
+      // per IP, and CI runners share IP pools across every concurrently
+      // running job on the platform - that cap gets hit constantly and has
+      // nothing to do with this repo. GITHUB_TOKEN is minted automatically
+      // for every GitHub Actions run with no setup and raises it to 5000/hr,
+      // more than enough for read-only access to a public repo.
+      docsCrawler = new DocsCrawler(
+        mockIde,
+        config,
+        5,
+        5,
+        false,
+        process.env.GITHUB_TOKEN,
+      );
       const { pages, crawler } = await runCrawl(repoUrl);
       crawlerUsed = crawler;
       crawlResults = pages;

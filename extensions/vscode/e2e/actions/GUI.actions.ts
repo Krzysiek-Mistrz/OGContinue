@@ -42,7 +42,8 @@ export class GUIActions {
     for (let i = 0; i < iframes.length; i++) {
       const iframe = iframes[i];
       const src = await iframe.getAttribute("src");
-      if (src.includes("extensionId=Continue.continue")) {
+      // Must match "publisher.name" from extensions/vscode/package.json.
+      if (src.includes("extensionId=Krzysiek-Mistrz.ogcontinue")) {
         continueIFrame = iframe;
         break;
       }

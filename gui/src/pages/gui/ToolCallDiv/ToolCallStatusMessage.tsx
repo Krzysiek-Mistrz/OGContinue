@@ -66,7 +66,7 @@ export function ToolCallStatusMessage({
   }
   return (
     <div className="block">
-      <span>Continue</span> {intro} {message}
+      <span>OGContinue</span> {intro} {message}
     </div>
   );
 }

@@ -89,6 +89,10 @@ describe("runTerminalCommandImpl", () => {
       deleteFile: jest.fn(),
       globFiles: jest.fn(),
       ls: jest.fn(),
+      // A failed command scans its own text for paths that exist elsewhere in
+      // the workspace; these two back that search.
+      fileExists: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
+      getFileResults: jest.fn<() => Promise<string[]>>().mockResolvedValue([]),
     };
 
     // Create a base ToolExtras object with required properties

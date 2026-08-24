@@ -202,10 +202,13 @@ describe("PROVIDER_TOOL_SUPPORT", () => {
       expect(supportsFn("mistral-openorca")).toBe(false);
     });
 
-    it("should return undefined for other models", () => {
-      expect(supportsFn("llama2")).toBeUndefined();
-      expect(supportsFn("phi-2")).toBeUndefined();
-      expect(supportsFn("falcon")).toBeUndefined();
+    it("should return true for other, unlisted models", () => {
+      // Ollama's function-calling support isn't gated behind an allowlist that
+      // would always lag new/uncommon models - only the known-bad substrings
+      // above are blocked, so anything else is allowed to try Agent mode.
+      expect(supportsFn("llama2")).toBe(true);
+      expect(supportsFn("phi-2")).toBe(true);
+      expect(supportsFn("falcon")).toBe(true);
     });
 
     it("should handle case insensitivity", () => {
@@ -222,7 +225,8 @@ describe("PROVIDER_TOOL_SUPPORT", () => {
       expect(PROVIDER_TOOL_SUPPORT["openai"]("")).toBeUndefined();
       expect(PROVIDER_TOOL_SUPPORT["gemini"]("")).toBe(false);
       expect(PROVIDER_TOOL_SUPPORT["bedrock"]("")).toBeUndefined();
-      expect(PROVIDER_TOOL_SUPPORT["ollama"]("")).toBeUndefined();
+      // Matches none of the known-bad substrings, so it falls through to true.
+      expect(PROVIDER_TOOL_SUPPORT["ollama"]("")).toBe(true);
     });
 
     it("should handle non-existent provider", () => {

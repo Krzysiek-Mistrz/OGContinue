@@ -34,15 +34,20 @@ import { setLocalStorage } from "../util/localStorage";
 import { useWebviewListener } from "./useWebviewListener";
 
 /**
- * The edit tool resolves before the user has accepted or rejected the diff, so
- * its result is filled in here once the diff closes. Sending back nothing at
- * all - which is what used to happen - leaves the model with no evidence its
- * edit ever landed, and small local models respond to that by reissuing the
- * same edit over and over.
+ * The edit tool used to only resolve once the user accepted or rejected the
+ * diff in the editor. In Agent mode nothing ever clicks that, so the tool
+ * call just hung - the model, waiting for a result, would eventually give up
+ * and call read_file to check for itself. That read hit the file mid-diff
+ * (pending green/red decorations, not the plain new content), looked wrong,
+ * and the model would edit again - which auto-rejects the still-pending
+ * previous diff (see manager.ts), reverting the file back to its original,
+ * unfixed contents. The model would then see its own fix undone and repeat
+ * the whole cycle forever.
  *
- * "closed" only means no diff blocks are left pending; it covers a rejection
- * just as much as an acceptance. So report the file's resulting contents rather
- * than claiming the change was kept.
+ * So the tool call now resolves as soon as streaming finishes ("done"),
+ * without waiting for the human review step - the diff stays pending in the
+ * editor for the user to accept/reject visually, but the model already has
+ * its answer and can move on instead of polling for one.
  */
 const MAX_REPORTED_FILE_CHARS = 4000;
 
@@ -51,10 +56,14 @@ function buildEditToolOutput(state: ApplyState): ContextItem {
     ? getUriPathBasename(state.filepath)
     : "the file";
   const fileContent = state.fileContent ?? "";
-  const content =
+  const truncatedContent =
     fileContent && fileContent.length <= MAX_REPORTED_FILE_CHARS
-      ? `The edit to ${filepath} is complete and no changes are left pending. The file now contains:\n\n${fileContent}\n\nDo not make this same edit again.`
-      : `The edit to ${filepath} is complete and no changes are left pending. Do not make this same edit again.`;
+      ? `\n\nThe file now contains:\n\n${fileContent}`
+      : "";
+  const content =
+    state.status === "closed"
+      ? `The edit to ${filepath} is complete and no changes are left pending.${truncatedContent}\n\nDo not make this same edit again.`
+      : `The edit to ${filepath} has been applied.${truncatedContent}\n\nIt is showing as a pending diff in the editor for the user to review - that is expected and does not need any action from you. Do not read the file again to check, and do not make this same edit again; move on to the rest of the task, or tell the user you're done if nothing is left.`;
 
   return {
     name: "Edit results",
@@ -293,9 +302,11 @@ function ParallelListeners() {
         // chat or agent
         dispatch(updateApplyState(state));
 
-        // Handle apply status updates that are associated with current tool call
+        // Handle apply status updates that are associated with current tool call.
+        // Resolve on "done" (streaming finished) rather than waiting for "closed"
+        // (human accept/reject) - see buildEditToolOutput for why.
         if (
-          state.status === "closed" &&
+          (state.status === "done" || state.status === "closed") &&
           currentToolCallApplyState &&
           currentToolCallApplyState.streamId === state.streamId
         ) {

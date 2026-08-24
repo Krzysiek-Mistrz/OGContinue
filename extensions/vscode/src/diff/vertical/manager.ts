@@ -204,10 +204,15 @@ export class VerticalDiffManager {
     const startLine = 0;
     const endLine = editor.document.lineCount - 1;
 
-    // Check for existing handlers in the same file the new one will be created in
+    // Check for existing handlers in the same file the new one will be created in.
+    // A pending diff from a prior agent tool call on this same file is kept
+    // (accepted) rather than silently discarded - the model has already moved
+    // on believing that edit landed, and rejecting it here would revert the
+    // file out from under it, driving it to "fix" the same thing again.
+    // Interactive (non-tool-call) edits keep the old reject-and-redo behavior.
     const existingHandler = this.getHandlerForFile(fileUri);
     if (existingHandler) {
-      existingHandler.clear(false);
+      await existingHandler.clear(!!toolCallId);
     }
 
     await new Promise((resolve) => {
@@ -349,7 +354,10 @@ export class VerticalDiffManager {
       // startLine += effectiveLineDelta;
       // endLine += effectiveLineDelta;
 
-      await existingHandler.clear(false);
+      // See streamDiffLines above: a pending agent tool-call diff is accepted,
+      // not rejected, so a follow-up edit doesn't revert work the model
+      // already believes landed.
+      await existingHandler.clear(!!toolCallId);
     }
 
     await new Promise((resolve) => {

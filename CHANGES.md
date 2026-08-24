@@ -8,8 +8,19 @@ Upstream development slowed down while this snapshot was already stable and had 
 
 ## Changes
 
-- _(planned)_ Working Agent mode, reworked for reliability on small local models.
-- _(planned)_ In-file Keep/Undo controls for Edit/Chat-applied diffs, replacing the single "Apply" button.
-- README and docs reframed around local-model / RAG usage.
+- Working Agent mode, reworked for reliability on small local models: tool calls are
+  recovered from plain-text or truncated output, file paths resolve tolerantly, a
+  stalled agent is nudged forward, and repeated identical tool calls are blocked.
+- In-file accept/reject controls for Agent-mode edits, matching Edit mode, instead of
+  relying only on the chat "Apply" button.
+- Live status of what the agent is doing (reading a file, running a command, editing)
+  shown in chat as it works.
+- Anonymous telemetry off by default; sign-in/hosted-account UI removed (no hosted
+  backend to sign into).
+- README and docs reframed around local-model usage, with a dedicated local setup
+  guide and recommended Ollama models by VRAM.
+- VS Code only — the JetBrains/IntelliJ and CLI variants inherited from upstream have
+  been removed.
 
-This list is updated as changes land. Individual commits and PRs remain the authoritative record.
+See [CHANGELOG.md](./extensions/vscode/CHANGELOG.md) for the full, version-by-version list.
+This summary is updated as changes land. Individual commits and PRs remain the authoritative record.

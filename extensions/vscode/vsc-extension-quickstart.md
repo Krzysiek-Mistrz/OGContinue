@@ -37,4 +37,4 @@ The output is `extensions/vscode/build/ogcontinue-<version>.vsix`. Install it wi
 code --install-extension build/ogcontinue-<version>.vsix
 ```
 
-(replace `<version>` with the version in `extensions/vscode/package.json`, e.g. `1.0.10`).
+(replace `<version>` with the version in `extensions/vscode/package.json`, e.g. `1.1.0`).

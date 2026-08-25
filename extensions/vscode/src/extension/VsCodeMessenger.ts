@@ -88,17 +88,6 @@ export class VsCodeMessenger {
       this.ide.openFile(msg.data.filepath);
     });
 
-    this.onWebview("vscode/openMoveRightMarkdown", (msg) => {
-      vscode.commands.executeCommand(
-        "markdown.showPreview",
-        vscode.Uri.joinPath(
-          getExtensionUri(),
-          "media",
-          "move-chat-panel-right.md",
-        ),
-      );
-    });
-
     this.onWebview("toggleDevTools", (msg) => {
       vscode.commands.executeCommand("continue.viewLogs");
     });

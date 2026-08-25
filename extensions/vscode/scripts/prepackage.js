@@ -459,7 +459,6 @@ void (async () => {
     "gui/assets/index.css",
 
     // Tutorial
-    "media/move-chat-panel-right.md",
     "continue_tutorial.py",
     "config_schema.json",
 

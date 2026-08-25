@@ -167,3 +167,4 @@ extensions/.continue-debug/
 # The Python-template "lib/" rule above hides the agent test fixture, which
 # makes it invisible to ripgrep-based file search and codebase indexing.
 !manual-testing-sandbox/agent-test-app/lib/
+binary/

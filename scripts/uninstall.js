@@ -13,11 +13,6 @@ const directories = [
   "./extensions/vscode/bin",
   "./extensions/vscode/build",
   "./extensions/vscode/out",
-  // binary
-  "./binary/node_modules",
-  "./binary/bin",
-  "./binary/dist",
-  "./binary/out",
   // root
   "./node_modules",
 ];

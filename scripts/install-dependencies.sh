@@ -60,9 +60,3 @@ npm link @continuedev/core
 npm run prepackage
 npm run package
 popd
-
-echo "Installing binary dependencies..."
-pushd binary
-npm install
-npm run build
-popd

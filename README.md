@@ -25,6 +25,12 @@
 
 <p></p>
 
+## Why OGContinue?
+
+Upstream Continue treats local models as a secondary path — most of its polish targets hosted, API-key models. OGContinue flips that: **local models via [Ollama](https://ollama.com) are the primary target**, not an afterthought, because they were the most neglected part of the original project.
+
+Concretely, that means Chat, Autocomplete, Edit, and Agent are all made to work reliably with local models — including small (7B-class and below) ones that struggle with tool-calling and instruction-following compared to hosted frontier models. Agent mode in particular gets extra recovery logic (tolerant path resolution, stuck-loop detection with a nudge back on track, tool-call output that actually confirms a change landed) specifically because small local models trip on things large hosted models rarely do. Larger local models and hosted API-key models still work exactly as before — this is about not leaving the smaller end of the range broken.
+
 ## Chat
 
 Ask questions about your code, get explanations, or brainstorm — without leaving the IDE.

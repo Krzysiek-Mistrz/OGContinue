@@ -78,7 +78,7 @@ export class ChunkCodebaseIndex implements CodebaseIndex {
     for (const item of results.addTag) {
       await db.run(
         `
-        INSERT INTO chunk_tags (chunkId, tag)
+        INSERT OR IGNORE INTO chunk_tags (chunkId, tag)
         SELECT id, ? FROM chunks
         WHERE cacheKey = ?
       `,
@@ -217,7 +217,7 @@ export class ChunkCodebaseIndex implements CodebaseIndex {
             },
           );
           const chunkTagsSQL =
-            "INSERT INTO chunk_tags (chunkId, tag) VALUES (last_insert_rowid(), ?)";
+            "INSERT OR IGNORE INTO chunk_tags (chunkId, tag) VALUES (last_insert_rowid(), ?)";
           db.db.run(
             chunkTagsSQL,
             [tagString],

@@ -143,6 +143,13 @@ To use the bundled one deliberately, declare it explicitly instead of leaving `e
 
 You can confirm which one is live under **Settings → Models → Embed**. Changing the embeddings model invalidates the existing index, so the codebase is re-indexed on the next run.
 
+### "error when indexing: SQLITE_CONSTRAINT: UNIQUE constraint failed: chunk_tags..."
+
+This can show up in the extension's dev console on the very first index of a
+workspace and is not a sign of a corrupted index or a broken install - it
+just means one chunk got tagged twice in the same pass. Run **OGContinue:
+Codebase Force Re-Index** from the command palette and it resolves itself.
+
 ## Modes: Chat, Edit, Agent
 
 Everything happens inside one continuous session — switching modes never throws away your conversation, it just changes what the next message does with it:

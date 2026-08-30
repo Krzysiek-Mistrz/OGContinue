@@ -9,6 +9,27 @@ at tag `v1.0.10-vscode`. This file starts fresh from the fork point — see
 for what's different from upstream, and upstream's own changelog for history
 before this point.
 
+## 1.2.0 - 2026-08-25
+### Added
+* Web search tool is back, now running against a keyless DuckDuckGo scrape
+  instead of Continue Dev's hosted proxy — no API key or hosted account
+  needed, works fully locally like everything else in this fork
+### Fixed
+* A codebase-indexing run could fail outright with
+  `SQLITE_CONSTRAINT: UNIQUE constraint failed: chunk_tags.tag, chunk_tags.chunkId`
+  if a chunk got tagged twice in the same pass; that insert is now a no-op
+  instead of aborting the whole index
+### Removed
+* Scheduled `vscode-version-bump` workflow, which existed to maintain
+  upstream Continue's own `v1.0.y-vscode`/`v1.1.x-vscode` release-branch
+  cadence — this fork tags directly on `main` instead, so it could only
+  ever fail here
+* More confirmed-dead code and infrastructure: `binary/` (leftover
+  non-VSCode IDE/CLI server), `sync/` (an unused Rust/NAPI crate),
+  `packages/hub`, `packages/continue-sdk` (a generated client for the
+  hosted Hub API this fork doesn't have), and the unused `changie`
+  changelog tooling
+
 ## 1.1.0 - 2026-08-24
 ### Added
 * Agent mode: tool calls are recovered even when a local model prints them as

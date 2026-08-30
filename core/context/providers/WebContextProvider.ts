@@ -1,3 +1,5 @@
+import * as cheerio from "cheerio";
+
 import { BaseContextProvider } from "..";
 import {
   ContextItem,
@@ -5,35 +7,73 @@ import {
   ContextProviderExtras,
   FetchFunction,
 } from "../..";
-import { getHeaders } from "../../continueServer/stubs/headers";
-import { TRIAL_PROXY_URL } from "../../control-plane/client";
+
+const SEARCH_ENDPOINT = "https://html.duckduckgo.com/html/";
+const USER_AGENT =
+  "Mozilla/5.0 (compatible; OGContinue/1.0; +https://github.com/Krzysiek-Mistrz/OGContinue)";
+
+function extractRealUrl(href: string): string {
+  try {
+    const parsed = new URL(href, "https://duckduckgo.com");
+    const uddg = parsed.searchParams.get("uddg");
+    return uddg ? decodeURIComponent(uddg) : href;
+  } catch {
+    return href;
+  }
+}
 
 export const fetchSearchResults = async (
   query: string,
   n: number,
   fetchFn: FetchFunction,
 ): Promise<ContextItem[]> => {
-  const resp = await fetchFn(WebContextProvider.ENDPOINT, {
-    method: "POST",
+  const url = new URL(SEARCH_ENDPOINT);
+  url.searchParams.set("q", query);
+
+  const resp = await fetchFn(url, {
+    method: "GET",
     headers: {
-      "Content-Type": "application/json",
-      ...(await getHeaders()),
+      "User-Agent": USER_AGENT,
     },
-    body: JSON.stringify({
-      query,
-      n,
-    }),
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Failed to fetch web context: ${text}`);
+    throw new Error(`Web search failed with status ${resp.status}`);
   }
-  return await resp.json();
+
+  const html = await resp.text();
+  const $ = cheerio.load(html);
+
+  const results: ContextItem[] = [];
+  $(".result").each((_, el) => {
+    if (results.length >= n) {
+      return false;
+    }
+
+    const titleEl = $(el).find(".result__a").first();
+    const title = titleEl.text().trim();
+    const resultUrl = extractRealUrl(titleEl.attr("href") ?? "");
+    const snippet = $(el).find(".result__snippet").text().trim();
+
+    if (!title || !resultUrl) {
+      return;
+    }
+
+    results.push({
+      name: title,
+      description: resultUrl,
+      content: `${title}\n${resultUrl}\n${snippet}`,
+    });
+  });
+
+  if (results.length === 0) {
+    throw new Error("Web search returned no parseable results");
+  }
+
+  return results;
 };
 
 export default class WebContextProvider extends BaseContextProvider {
-  public static ENDPOINT = new URL("web", TRIAL_PROXY_URL);
   private static DEFAULT_N = 6;
 
   static description: ContextProviderDescription = {

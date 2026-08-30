@@ -14,7 +14,9 @@ import { streamNormalInput } from "./streamNormalInput";
  * 4/4. A system-role nudge had no effect at all.
  *
  * The nudge is only sent for a response that announces a next action, so a
- * genuine "the task is done" answer is left alone.
+ * genuine "the task is done" answer is left alone. It is also sent for a
+ * response that looks like a tool call the provider's own recovery couldn't
+ * parse
  */
 const NUDGE_MESSAGE: ChatMessage = {
   role: "user",
@@ -24,6 +26,10 @@ const NUDGE_MESSAGE: ChatMessage = {
 
 const ANNOUNCES_NEXT_STEP =
   /\b(let'?s|let us|i'?ll|i will|next[,:]?\s|now[,:]?\s+(?:i|we|let)|we (?:need to|should|can|will)|first[,:]?\s|start by)\b/i;
+
+// Any text after streaming finished is almost certainly a
+// tool call that fell through recovery, not prose the user is meant to read.
+const LOOKS_LIKE_UNRECOVERED_TOOL_CALL = /\{\s*"[A-Za-z0-9_]+"\s*:/;
 
 /**
  * Re-streams once with the nudge appended when the model ended its turn on an
@@ -58,7 +64,10 @@ export async function nudgeStalledAgent({
   }
 
   const stalledResponse = renderChatMessage(history[history.length - 1]?.message);
-  if (!ANNOUNCES_NEXT_STEP.test(stalledResponse)) {
+  if (
+    !ANNOUNCES_NEXT_STEP.test(stalledResponse) &&
+    !LOOKS_LIKE_UNRECOVERED_TOOL_CALL.test(stalledResponse)
+  ) {
     return;
   }
 

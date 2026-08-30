@@ -105,8 +105,17 @@ function repairPseudoJsonCandidate(candidate: string): string {
  * the beginning of a tool call printed as plain JSON. Returns the index of
  * that point, including an opening code fence when the object is wrapped in
  * one, or -1 when nothing needs to be held back.
+ *
+ * Also holds back a bare tool name typed just before its arguments arrive
+ * (some models print `<tool_name> {args}` instead of wrapping the call in
+ * `{"name": ..., "arguments": ...}`) so `<tool_name> ` isn't streamed out as
+ * ordinary text before `tryRecoverToolCallFromText` gets a chance to match
+ * it against the JSON object that follows.
  */
-function findToolCallTextStart(text: string): number {
+function findToolCallTextStart(
+  text: string,
+  validToolNames: string[] = [],
+): number {
   const braceIndex = text.indexOf("{");
   // A fence arriving before the opening brace must be held back too,
   // otherwise it is streamed out and left orphaned once the tool call it
@@ -117,7 +126,16 @@ function findToolCallTextStart(text: string): number {
   if (fenceMatch?.index !== undefined) {
     return fenceMatch.index;
   }
-  return braceIndex;
+  if (braceIndex !== -1) {
+    return braceIndex;
+  }
+
+  const trailingWordMatch = text.match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/);
+  if (trailingWordMatch && validToolNames.includes(trailingWordMatch[1])) {
+    return trailingWordMatch.index!;
+  }
+
+  return -1;
 }
 
 /**
@@ -224,6 +242,20 @@ export function tryRecoverToolCallFromText(
         content.slice(0, i) + content.slice(consumedTo)
       ).trim();
       return { name: parsed.name, args: parsed.arguments, remainingText };
+    }
+
+    // Hermes/Qwen-style calls print the tool name as a bare word immediately
+    // before its arguments object, instead of wrapping both in a
+    // {"name": ..., "arguments": ...} envelope
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const beforeText = content.slice(0, i);
+      const bareNameMatch = beforeText.match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/);
+      if (bareNameMatch && validToolNames.includes(bareNameMatch[1])) {
+        const remainingText = (
+          content.slice(0, bareNameMatch.index) + content.slice(consumedTo)
+        ).trim();
+        return { name: bareNameMatch[1], args: parsed, remainingText };
+      }
     }
   }
 
@@ -810,7 +842,7 @@ class Ollama extends BaseLLM implements ModelInstaller {
           }
 
           withheldText += renderChatMessage(chatMessage);
-          const holdFrom = findToolCallTextStart(withheldText);
+          const holdFrom = findToolCallTextStart(withheldText, validToolNames);
           if (holdFrom === -1) {
             yield { role: "assistant", content: withheldText };
             withheldText = "";

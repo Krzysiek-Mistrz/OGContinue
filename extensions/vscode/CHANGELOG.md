@@ -19,6 +19,14 @@ before this point.
   `SQLITE_CONSTRAINT: UNIQUE constraint failed: chunk_tags.tag, chunk_tags.chunkId`
   if a chunk got tagged twice in the same pass; that insert is now a no-op
   instead of aborting the whole index
+* A tool call printed as a bare `tool_name {"arg": "value"}` (name before the
+  JSON, no `name`/`arguments` wrapper — a format Qwen/Hermes-style models use
+  that our text-recovery only partly handled) fell through unrecovered,
+  landing in the chat as permanently inert text with no error and no nudge,
+  so the model just kept repeating the same dead call. Recovery now matches
+  this format too, and the stalled-agent nudge also fires for any leftover
+  tool-call-shaped text that still fails to parse, instead of only for a
+  response that verbally announces its next step
 ### Removed
 * Scheduled `vscode-version-bump` workflow, which existed to maintain
   upstream Continue's own `v1.0.y-vscode`/`v1.1.x-vscode` release-branch

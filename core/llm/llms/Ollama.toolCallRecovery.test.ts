@@ -50,4 +50,22 @@ describe("recovering a tool call printed as text", () => {
       tryRecoverToolCallFromText('Config: {"model": "qwen"}', TOOLS),
     ).toBeNull();
   });
+
+  test("recovers a bare '<tool_name> {args}' call with no name/arguments envelope", () => {
+    const recovered = tryRecoverToolCallFromText(
+      'Let\'s read the file.\n\nbuiltin_read_file {"filepath":"Rust-Tic-Tac-Toe/main.rs"}',
+      TOOLS,
+    );
+    expect(recovered).toMatchObject({
+      name: "builtin_read_file",
+      args: { filepath: "Rust-Tic-Tac-Toe/main.rs" },
+      remainingText: "Let's read the file.",
+    });
+  });
+
+  test("ignores a bare object whose preceding word is not a valid tool name", () => {
+    expect(
+      tryRecoverToolCallFromText('some_setting {"model": "qwen"}', TOOLS),
+    ).toBeNull();
+  });
 });

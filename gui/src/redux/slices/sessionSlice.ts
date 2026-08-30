@@ -256,6 +256,23 @@ export const sessionSlice = createSlice({
 
       state.isStreaming = false;
     },
+    /**
+     * Replaces the full history with a single condensed recap once the
+     * conversation is close to filling the model's context window
+     */
+    compactHistory: (state, { payload }: PayloadAction<{ summary: string }>) => {
+      state.history = [
+        {
+          message: {
+            id: uuidv4(),
+            role: "assistant",
+            content: `Here's a summary of this conversation so far, condensed to keep it within the model's context window:\n\n${payload.summary}`,
+          },
+          contextItems: [],
+        },
+      ] as any;
+      state.codeBlockApplyStates = { states: [], curIndex: 0 };
+    },
     abortStream: (state) => {
       state.streamAborter.abort();
       state.streamAborter = new AbortController();
@@ -699,6 +716,7 @@ export const {
   setContextItemsAtIndex,
   addContextItemsAtIndex,
   setInactive,
+  compactHistory,
   streamUpdate,
   newSession,
   updateSessionTitle,

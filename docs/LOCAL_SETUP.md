@@ -125,6 +125,42 @@ context:
 - Close other GPU-heavy applications before starting a long Agent session.
 - Q4_K_M quantization is the right balance of quality/speed at this VRAM tier — avoid Q8 or fp16 variants of the 7B model here.
 
+### "Not enough context available to include the system message..."
+
+This means the conversation - system message, tool definitions, and the
+last message - no longer fits in the model's context window. It's most
+likely to happen in a long Agent session that has read several files or
+done a web search, since those results all stay in the conversation.
+
+If your `config.yaml` doesn't set a `contextLength`, OGContinue defaults to
+8192 tokens, which is on the small side for Agent mode. Raise it explicitly
+on the model entry, matching what your Ollama model actually supports (check
+with `ollama show <model>`; Qwen2.5-Coder supports up to 32768):
+
+```yaml
+  - name: Qwen2.5 Coder 7B (local)
+    provider: ollama
+    model: qwen2.5-coder:7b-instruct-q4_K_M
+    contextLength: 32768
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+```
+
+A larger context window uses more VRAM/RAM, so on a 6 GB card stay closer to
+16k than 32k. A context-usage indicator next to the chat input (e.g. `42%
+context`) shows how full the window is as the conversation grows, so you can
+see this coming before it turns into a hard failure. Click it to compact:
+the model condenses the whole conversation into a summary that replaces the
+full history, freeing up most of the window so a long Agent session can keep
+going. This is manual - it doesn't happen automatically - and older turns
+aren't visible afterward, only the summary. If you're already past the point
+where a request fails outright, compacting can't help retroactively; raise
+`contextLength` instead and start a new session.
+
 ## Which embeddings model is actually used?
 
 Embeddings power codebase search (the `codebase` context provider and `@` codebase queries).

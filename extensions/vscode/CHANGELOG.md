@@ -14,11 +14,21 @@ before this point.
 * Web search tool is back, now running against a keyless DuckDuckGo scrape
   instead of Continue Dev's hosted proxy — no API key or hosted account
   needed, works fully locally like everything else in this fork
+* A context-usage indicator next to the chat input shows how full the
+  model's context window is; clicking it compacts the conversation by
+  having the model summarize it, replacing the full history to free up
+  room for a long Agent session to keep going
 ### Fixed
 * A codebase-indexing run could fail outright with
   `SQLITE_CONSTRAINT: UNIQUE constraint failed: chunk_tags.tag, chunk_tags.chunkId`
   if a chunk got tagged twice in the same pass; that insert is now a no-op
   instead of aborting the whole index
+* `read_file`/`read_currently_open_file` had no cap on how much of a file
+  they reported back, so one or two ordinary file reads could exhaust a
+  small local model's context window (as little as 8192 tokens by default)
+  and permanently fail the next request with no way to recover. Both now
+  truncate past 8000 characters with a note telling the model to grep or
+  read further
 * A tool call printed as a bare `tool_name {"arg": "value"}` (name before the
   JSON, no `name`/`arguments` wrapper — a format Qwen/Hermes-style models use
   that our text-recovery only partly handled) fell through unrecovered,

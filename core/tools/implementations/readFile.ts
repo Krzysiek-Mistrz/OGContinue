@@ -5,6 +5,10 @@ import { ToolImpl } from ".";
 
 const MAX_SUGGESTIONS = 10;
 
+// A local model's context window can be as small as 8192 tokens
+// (default when a config doesn't set contextLength). Cap what a single read reports back
+export const MAX_REPORTED_FILE_CHARS = 8000;
+
 /**
  * When a path cannot be resolved at all, point the model at the real
  * locations of that filename so it can retry instead of stalling.
@@ -43,7 +47,12 @@ export const readFileImpl: ToolImpl = async (args, extras) => {
     throw new Error(await describeMissingFile(args.filepath, extras));
   }
 
-  const content = await extras.ide.readFile(resolvedUri);
+  const fullContent = await extras.ide.readFile(resolvedUri);
+  const content =
+    fullContent.length > MAX_REPORTED_FILE_CHARS
+      ? `${fullContent.slice(0, MAX_REPORTED_FILE_CHARS)}\n\n[Truncated: showing the first ${MAX_REPORTED_FILE_CHARS} of ${fullContent.length} characters. Use grep search to find a specific part of this file, or read it again with a narrower request.]`
+      : fullContent;
+
   return [
     {
       name: getUriPathBasename(args.filepath),

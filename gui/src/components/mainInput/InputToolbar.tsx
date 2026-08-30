@@ -1,15 +1,18 @@
 import { AtSymbolIcon, PhotoIcon } from "@heroicons/react/24/outline";
+import { unwrapResult } from "@reduxjs/toolkit";
 import { InputModifiers } from "core";
 import { modelSupportsImages, modelSupportsTools } from "core/llm/autodetect";
-import { useContext, useRef } from "react";
+import { useContext, useRef, useState } from "react";
 import { IdeMessengerContext } from "../../context/IdeMessenger";
 import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { selectUseActiveFile } from "../../redux/selectors";
+import { selectContextUsagePercentage } from "../../redux/selectors/selectContextUsage";
 import {
   selectCurrentToolCall,
   selectCurrentToolCallApplyState,
 } from "../../redux/selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../../redux/slices/configSlice";
+import { compactSessionHistoryThunk } from "../../redux/thunks/compactSessionHistory";
 import { exitEditMode } from "../../redux/thunks/editMode";
 import {
   getAltKeyLabel,
@@ -55,6 +58,31 @@ function InputToolbar(props: InputToolbarProps) {
   const currentToolCallApplyState = useAppSelector(
     selectCurrentToolCallApplyState,
   );
+  const historyLength = useAppSelector((store) => store.session.history.length);
+  const contextUsagePercentage = useAppSelector(selectContextUsagePercentage);
+  const isStreaming = useAppSelector((store) => store.session.isStreaming);
+  const [isCompacting, setIsCompacting] = useState(false);
+
+  async function handleCompactContext() {
+    if (isCompacting || isStreaming) {
+      return;
+    }
+    setIsCompacting(true);
+    try {
+      unwrapResult(await dispatch(compactSessionHistoryThunk()));
+      ideMessenger.post("showToast", [
+        "info",
+        "Conversation compacted to free up context",
+      ]);
+    } catch (e) {
+      ideMessenger.post("showToast", [
+        "error",
+        `Failed to compact conversation: ${e instanceof Error ? e.message : e}`,
+      ]);
+    } finally {
+      setIsCompacting(false);
+    }
+  }
 
   const isEnterDisabled =
     props.disabled ||
@@ -182,6 +210,27 @@ function InputToolbar(props: InputToolbarProps) {
                 </HoverItem>
               )}
             </div>
+          )}
+
+          {props.isMainInput && historyLength > 0 && (
+            <HoverItem
+              data-tooltip-id="context-usage-tooltip"
+              className={
+                contextUsagePercentage >= 85
+                  ? "!text-red-400"
+                  : contextUsagePercentage >= 60
+                    ? "!text-yellow-500"
+                    : ""
+              }
+              onClick={handleCompactContext}
+            >
+              {isCompacting ? "Compacting…" : `${contextUsagePercentage}% context`}
+              <ToolTip id="context-usage-tooltip" place="top-end">
+                {isCompacting
+                  ? "Summarizing the conversation to free up context…"
+                  : "Click to compact (older messages won't be visible afterward)"}
+              </ToolTip>
+            </HoverItem>
           )}
 
           {mode === "edit" && (

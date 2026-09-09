@@ -175,6 +175,9 @@ llama-server -m ~/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf \
 
 llama-server -m ~/models/qwen2.5-coder-1.5b-base-q8_0.gguf \
   -ngl 99 -c 4096 --host 127.0.0.1 --port 8081
+
+llama-server -m ~/models/nomic-embed-text-v1.5.f16.gguf \
+  --embedding --pooling mean -ub 2048 --host 127.0.0.1 --port 8082
 ```
 
 ```yaml
@@ -200,9 +203,10 @@ models:
     roles:
       - autocomplete
 
-  - name: Nomic Embed (ollama)
-    provider: ollama
+  - name: Nomic Embed (llama.cpp)
+    provider: llama.cpp
     model: nomic-embed-text
+    apiBase: http://127.0.0.1:8082/
     roles:
       - embed
 context:
@@ -215,12 +219,14 @@ context:
   - provider: codebase
 ```
 
-The embed role stays on `provider: ollama` on purpose: `LlamaCpp` in this fork
-only implements chat/edit/apply/autocomplete (`_streamChat`/`_streamComplete`),
-not `_embed` — so codebase indexing still needs Ollama running for
-`nomic-embed-text` even in an otherwise all-llama.cpp setup. `model:` under
-`llama.cpp` is just a label for the UI; the server only ever serves whatever
-GGUF it was started with, so it doesn't need to match anything.
+Full parity with Ollama, `embed` included: `LlamaCpp` in this fork implements
+chat/edit/apply/autocomplete and `_embed`, the last one hitting `llama-server`'s
+`/v1/embeddings`. The only structural difference from Ollama is that one
+`llama-server` process serves exactly one loaded GGUF, so each role needing a
+different model needs its own server on its own port - the embedding model is
+tiny, so a third instance alongside the other two costs little VRAM. `model:`
+under `llama.cpp` is just a label for the UI; the server only ever serves
+whatever GGUF it was started with, so it doesn't need to match anything.
 
 ## 4 paid models suggested config:
 

@@ -31,6 +31,7 @@ class LlamaCpp extends BaseLLM {
   static providerName = "llama.cpp";
   static defaultOptions: Partial<LLMOptions> = {
     apiBase: "http://127.0.0.1:8080/",
+    maxEmbeddingBatchSize: 64,
   };
 
   private _convertArgs(options: CompletionOptions, prompt: string) {
@@ -239,6 +240,36 @@ class LlamaCpp extends BaseLLM {
         yield { role: "assistant", content };
       }
     }
+  }
+
+  protected async _embed(chunks: string[]): Promise<number[][]> {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${this.apiKey}`,
+      ...this.requestOptions?.headers,
+    };
+
+    // A dedicated llama-server serving an embedding GGUF, separate from the
+    // one serving chat - one process can only ever have one model loaded.
+    const resp = await this.fetch(new URL("v1/embeddings", this.apiBase), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ input: chunks }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Failed to embed chunk: ${await resp.text()}`);
+    }
+
+    const data = (await resp.json()) as {
+      data?: Array<{ embedding: number[] }>;
+    };
+    const embeddings = data.data?.map((d) => d.embedding);
+
+    if (!embeddings || embeddings.length === 0) {
+      throw new Error("llama.cpp generated empty embedding");
+    }
+    return embeddings;
   }
 }
 

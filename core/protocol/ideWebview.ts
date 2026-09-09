@@ -80,9 +80,7 @@ export type ToWebviewFromIdeProtocol = ToWebviewFromIdeOrCoreProtocol & {
   setColors: [{ [key: string]: string }, void];
   "jetbrains/editorInsetRefresh": [undefined, void];
   "jetbrains/isOSREnabled": [boolean, void];
-  addApiKey: [undefined, void];
   setupLocalConfig: [undefined, void];
-  incrementFtc: [undefined, void];
   openOnboardingCard: [undefined, void];
   applyCodeFromChat: [undefined, void];
   updateApplyState: [ApplyState, void];

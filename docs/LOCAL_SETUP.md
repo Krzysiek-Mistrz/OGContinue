@@ -6,11 +6,46 @@ This guide covers running OGContinue entirely against local models via [Ollama](
 
 | VRAM   | Chat / Edit / Agent model             | Embeddings (RAG)     |
 | ------ | ------------------------------------- | -------------------- |
-| 6 GB   | `qwen2.5-coder:7b-instruct-q4_K_M`    | `nomic-embed-text`   |
+| 6 GB   | `gemma4-e4b-q4` or `qwen2.5-coder:7b-instruct-q4_K_M` | `nomic-embed-text` |
 | 8-12 GB| `qwen2.5-coder:14b-instruct-q4_K_M`   | `nomic-embed-text`   |
 | 16+ GB | `qwen2.5-coder:32b-instruct-q4_K_M`   | `nomic-embed-text`   |
 
-Qwen2.5-Coder was chosen over general-purpose models because it has strong function-calling support, which Agent mode depends on.
+## Which models are actually tested
+
+Agent mode is the demanding role, so models are measured on it rather than
+judged by reputation. The fixture in
+[`manual-testing-sandbox/agent-eval`](https://github.com/Krzysiek-Mistrz/OGContinue/tree/main/manual-testing-sandbox/agent-eval)
+gives the model a small broken project — two files to fix, in directories the
+request does not spell out, and a third file that has to run afterwards — and
+then checks the result behaviourally. A run counts only if all eight checks
+pass with no human help at any point.
+
+| Model | Size | Runs fixed completely | Steps | Native tool calls | Verdict |
+| ----- | ---- | --------------------- | ----- | ----------------- | ------- |
+| `gemma4-e4b-q4` | 7.5B | 3/3 | 6-7 | yes | **Recommended.** No nudges, no repeated reads, ends by handing back cleanly |
+| `qwen2.5-coder:7b-instruct-q4_K_M` | 7.6B | 5/5 | 5-6 | **no** | Just as reliable here, one step shorter on average. Every tool call arrives as plain text and is parsed back by the recovery layer |
+| `qwen2.5-coder:1.5b-base-q8_0` | 1.5B | n/a | - | n/a | Autocomplete only — a base model, not for chat or agent |
+
+Every run of both models finished by calling the completion tool rather than
+by running out of steps or stalling.
+
+The `qwen2.5-coder:7b` result is the surprising one: across every run it never
+once used the tool-calling API, printing each call as prose instead. Agent
+mode on that model works entirely because those get recovered (see [Agent mode
+reliability](#agent-mode-reliability-with-small-local-models) below). That
+makes it more sensitive to changes in the harness than gemma4 is, even though
+its score here is identical.
+
+The 14B and 32B rows in the VRAM table are extrapolations from the 7B result,
+not measurements — nothing that large has been run against the fixture here.
+
+To measure a model yourself:
+
+```bash
+cd manual-testing-sandbox/agent-eval
+./build-probe.sh          # once, and after changing harness code
+./run-eval.sh <your-ollama-model> 5
+```
 
 ## Autocomplete
 
@@ -40,11 +75,56 @@ configured for the `autocomplete` role, click it and toggle **Disable
 Autocomplete** then **Enable Autocomplete** — this forces it to re-read the
 current config and reliably fixes it.
 
-## Example `config.yaml`
+## Suggested `config.yaml` 4 OLLAMA
 
 Agent mode isn't a separate role — it's enabled automatically once a model with tool-calling support is assigned the `chat` role. Embeddings for RAG/codebase search are just another model entry with the `embed` role, not a separate top-level key.
 
-3 local models config:
+3 local models config — gemma4 for chat/edit/agent, a small Qwen base model
+for autocomplete, Nomic for embeddings. Scored 3/3 on the agent fixture:
+
+```yaml
+name: Local Assistant
+version: 1.0.0
+schema: v1
+models:
+  - name: Gemma4 E4B (local)
+    provider: ollama
+    model: gemma4-e4b-q4
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Qwen2.5 Coder 1.5B Base (local)
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base-q8_0
+    roles:
+      - autocomplete
+
+  - name: Nomic Embed (local)
+    provider: ollama
+    model: nomic-embed-text
+    roles:
+      - embed
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
+  - provider: problems
+  - provider: folder
+  - provider: codebase
+```
+
+Use the tag your own `ollama list` shows for the gemma4 build you pulled —
+model tags differ between registries, and the `model:` field has to match it
+exactly.
+
+3 local models config, Qwen2.5-Coder throughout — scored 5/5 on the same
+fixture, so it is an equally good choice:
+
 ```yaml
 name: Local Assistant
 version: 1.0.0
@@ -81,7 +161,69 @@ context:
   - provider: codebase
 ```
 
-4 paid models config:
+## Suggested `config.yaml` for llama.cpp
+
+The `llama.cpp` provider talks to `llama-server`'s OpenAI-compatible API and
+supports native + text-recovered tool calling in Agent mode, same as Ollama.
+Unlike Ollama, one `llama-server` process serves exactly one loaded GGUF, so
+running chat and autocomplete models at the same time means one `llama-server`
+per role, each on its own port:
+
+```bash
+llama-server -m ~/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf \
+  -ngl 99 -c 8192 --host 127.0.0.1 --port 8080 --jinja
+
+llama-server -m ~/models/qwen2.5-coder-1.5b-base-q8_0.gguf \
+  -ngl 99 -c 4096 --host 127.0.0.1 --port 8081
+```
+
+```yaml
+name: Local Assistant
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen2.5 Coder 7B (llama.cpp)
+    provider: llama.cpp
+    model: qwen2.5-coder-7b
+    apiBase: http://127.0.0.1:8080/
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Qwen2.5 Coder 1.5B Base (llama.cpp)
+    provider: llama.cpp
+    model: qwen2.5-coder-1.5b-base
+    apiBase: http://127.0.0.1:8081/
+    roles:
+      - autocomplete
+
+  - name: Nomic Embed (ollama)
+    provider: ollama
+    model: nomic-embed-text
+    roles:
+      - embed
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
+  - provider: problems
+  - provider: folder
+  - provider: codebase
+```
+
+The embed role stays on `provider: ollama` on purpose: `LlamaCpp` in this fork
+only implements chat/edit/apply/autocomplete (`_streamChat`/`_streamComplete`),
+not `_embed` — so codebase indexing still needs Ollama running for
+`nomic-embed-text` even in an otherwise all-llama.cpp setup. `model:` under
+`llama.cpp` is just a label for the UI; the server only ever serves whatever
+GGUF it was started with, so it doesn't need to match anything.
+
+## 4 paid models suggested config:
+
 ```yaml
 name: Local Assistant
 version: 1.0.0
@@ -208,9 +350,16 @@ Ollama's native tool-calling depends on the model's chat template emitting a spe
 
 - **Tool calls printed as plain text are recovered.** If the model prints `{"name": "...", "arguments": {...}}` as a message instead of a real tool call - including when the response is cut off before the closing `}` - it's parsed back into a real call rather than shown as raw JSON. A bare `tool_name {"arg": "value"}` form (name printed before the arguments object, with no `name`/`arguments` wrapper - common with Qwen/Hermes-style models) is recognized the same way.
 - **Paths are resolved tolerantly.** Small models frequently get a path slightly wrong (missing a leading folder, an extra one, an absolute path copied from a terminal error). Read, edit, list, and create-file all fall back to a workspace-wide search for the file or folder before giving up, and a failed read/edit tells the model the real path instead of just failing.
-- **A stalled agent is nudged forward once.** If the model announces the next step ("Let's now update...") without calling the tool to do it, it's prompted once to actually call it. This is invisible in the chat - it isn't added to the conversation history.
+- **A turn ends by calling an explicit `task_complete` tool.** Otherwise "finished" has to be guessed at - from whether the model happened to call another tool, or from whether its prose sounds like a conclusion - and a finished turn looks exactly like a stalled one. The call is checked before it's accepted: if a file the request named hasn't been edited, or something it asked to be verified hasn't been, the tool answers with what's left instead of ending the turn.
+- **A file with a pending diff reads back as it will look once accepted.** While a change waits for your accept/reject, the removed lines aren't deleted from the document - they're replaced by blank lines, with the old text held in a decoration. So an agent that read a file it had just edited got back something matching neither its edit nor the original, couldn't confirm its own change, and would re-edit or stall until you clicked accept. Reads now skip those placeholders, so you no longer have to accept a diff quickly to keep the agent moving.
+- **The task state is restated to the model every turn.** The most reliable cause of a small model looping is that it forgets: each turn it attends mostly to the newest tool result, while earlier ones drift into the middle of a growing context where attention is weakest, so it re-reads a file it read three turns ago and never converges. So a short block is appended at the end of every agent request saying what has been read, what has been changed, and what the request still needs. It's built from the tool calls the extension actually executed, never from the model's own account of its progress, so it stays right exactly when the model's self-report doesn't, and it always refers to a file by the path those calls proved it resolves to - naming one file two ways is itself enough to send a model off to re-read something it was just told it already had. This is the single most model-independent part of the harness - it makes no assumption about how a given model phrases anything.
+- **A file the request names as the outcome becomes a verification step.** In "fix A and B so that `src/main.py` runs", `main.py` isn't something to edit, but the request does ask that it works. Once every file to change has been changed, the remaining step is to run it and report the result, rather than declaring the task finished untested.
+- **Repeating a read is answered, not refused.** A read-only tool is idempotent, so repeating it is wasteful but never harmful, and refusing it takes away the only way the model has to recover something it forgot - if it also can't list the directory, it has no way forward at all and the turn deadlocks. A repeated read now runs and returns its result, with an explicit note that it is a repeat and nothing has changed. Only a tool that *changes* something is blocked outright after the second identical call.
+- **An action the agent only described is carried out for it.** The most common way a small model stalls is to say what it's about to do instead of doing it - printing the fixed code as a block, or announcing "let's read `math_utils/stats.py`" and stopping. In both cases the description already names everything the tool call needs, so it's reconstructed and run rather than asked for again: a code block preceded by a file path becomes a real file edit, and a file the task still needs but that got no tool call becomes a read. The reconstructed call behaves exactly like one the model made itself - it still respects your per-tool permission settings, still shows up as an accept/reject diff for an edit, and is still subject to the repeated-call guard.
+- **Agent mode tracks a task plan and nudges a stalled agent toward it, up to twice.** The file paths your own request asks to be *changed* are extracted up front - one named only as the outcome to check ("fix A and B so that `src/main.py` runs") is left out, since nothing will ever edit it - and checked against which ones a successful *file-changing* tool call has covered - not against what the model says about its own progress, since a small model's account of "what's left" is exactly what's unreliable here, and not against reads either, since reading a file up front is how it starts work on it rather than how it finishes. If the model ends a turn without calling a tool while a plan target is still unedited - whether it announced a next step and didn't take it, or just stopped with no explanation at all - it's nudged to call the tool on that specific file, retrying once more if that doesn't land either, and a premature "the task is done" claim is not taken at face value while a target remains untouched. The nudge prompts themselves are invisible in the chat. If both attempts fail, a visible notice is posted naming what's still unfinished, rather than the turn just ending silently - this is a best-effort mitigation for a real model limitation, not a guarantee it will always finish a multi-file task unattended.
 - **A failed terminal command says where it ran.** Commands run from the workspace root, not from the folder of whatever file the model was just reading. On failure the output now names the working directory and, for any path in the command that exists elsewhere in the workspace, where it actually is.
 - **The file-edit tool reports back what the file now contains.** It used to return nothing at all, which left the model with no evidence its edit had landed - and small models answer that by making the same edit again, forever.
+- **The edit tool asks for the complete new file content, not an abbreviated diff.** A full-file edit is applied instantly and deterministically; a `// ... existing code ...`-style partial edit has to be merged back in by a *second, invisible LLM call* that never shows up as part of the conversation - if that call is slow or stalls, the agent looks like it silently hung right after the tool call. Asking for the whole file skips that second call for the common case.
 - **A tool call repeated verbatim is blocked after the second attempt**, since a third identical call cannot produce a different result. The model is told why and given a couple of chances to do something else; if it keeps reissuing the same call, the turn ends rather than looping. Note this only catches *byte-identical* repeats - a model that varies its arguments slightly each time isn't caught by it, which is why the edit-result fix above matters more.
 
 None of this changes what the model can do - it only keeps small models from getting stuck on formatting or path mistakes that a larger model would rarely make.

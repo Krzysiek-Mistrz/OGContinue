@@ -1,11 +1,13 @@
 import { createAsyncThunk, unwrapResult } from "@reduxjs/toolkit";
 import { ContextItem } from "core";
-import { CLIENT_TOOLS } from "core/tools/builtIn";
+import { BuiltInToolNames, CLIENT_TOOLS } from "core/tools/builtIn";
+import { reasonTaskIncomplete } from "../../util/taskStateRecitation";
 import { callClientTool } from "../../util/clientTools/callClientTool";
 import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   acceptToolCall,
+  setAgentPlanSteps,
   errorToolCall,
   setToolCallCalling,
   updateToolCallOutput,
@@ -13,36 +15,15 @@ import {
 import { ThunkApiType } from "../store";
 import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
 
-/**
- * Small local models get stuck reissuing one tool call verbatim - the same ls
- * of a directory that does not resolve, or the same no-op edit - and will keep
- * going until the user stops them. The result cannot change, so refuse the call
- * once it has already been made twice and tell the model to do something else.
- *
- * A blocked call almost always means the model already made the change and
- * just hasn't noticed - re-reading the file would show its own edit already
- * applied. So every tier below keeps nudging the model to look again and move
- * on, the same way a manual "Regenerate" reliably unstuck it in testing,
- * rather than silently stopping and leaving the model's last word as another
- * attempt at the same call. Only ABSOLUTE_MAX_TOOL_CALLS_PER_TURN - reserved
- * for a model that ignores every nudge - actually ends the turn, purely to
- * cap runaway token cost.
- */
+// A small model gets stuck reissuing the same call verbatim - refuse it after
+// twice and nudge to look again (it usually already made the change) rather
+// than stopping outright. Only ABSOLUTE_MAX_TOOL_CALLS_PER_TURN ends the turn.
 const IDENTICAL_CALL_LIMIT = 2;
 const IDENTICAL_CALL_STRONG_NUDGE_LIMIT = 4;
 
-/**
- * The identical-call guard above only catches byte-identical repeats. In
- * practice a small model asked to redo the same edit rarely reproduces it
- * exactly - a comment worded slightly differently, different whitespace - so
- * it drifts through a series of near-identical variants, each one dodging the
- * identical-call counter by never repeating any single variant often enough
- * to trip it. Observed live: "fix the type mismatch in text.py" cycling
- * through edit_existing_file with subtly different `changes` text call after
- * call. This is a second, argument-independent backstop: however varied the
- * arguments, a turn that has made this many tool calls without reaching an
- * answer is very likely stuck redoing work it already finished.
- */
+// Backstop for the identical-call guard above, which only catches
+// byte-identical repeats - a model that varies whitespace/wording each time
+// drifts past it. This many calls without an answer is very likely a loop.
 const MAX_TOOL_CALLS_PER_TURN = 15;
 const ABSOLUTE_MAX_TOOL_CALLS_PER_TURN = 30;
 
@@ -108,7 +89,16 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
       state.session.history,
     );
 
-    const overIdenticalLimit = identicalCalls >= IDENTICAL_CALL_LIMIT;
+    // blocking a read is a deadlock, not a guard - it's idempotent, so a
+    // repeat just runs again with a loud note attached; only mutating tools
+    // get blocked outright
+    const isReadonly =
+      state.config.config.tools.find(
+        (tool) => tool.function.name === toolName,
+      )?.readonly === true;
+
+    const overIdenticalLimit =
+      !isReadonly && identicalCalls >= IDENTICAL_CALL_LIMIT;
     const overStrongNudgeLimit =
       identicalCalls >= IDENTICAL_CALL_STRONG_NUDGE_LIMIT;
     const overTurnBudget = turnToolCallCount >= MAX_TOOL_CALLS_PER_TURN;
@@ -141,6 +131,50 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
         );
       }
       return;
+    }
+
+    // model's own plan, recorded as given - stored here, next to the progress tracking that reads it
+    if (toolName === BuiltInToolNames.SetTaskPlan) {
+      const steps = toolCallState.parsedArgs?.steps;
+      if (Array.isArray(steps)) {
+        dispatch(
+          setAgentPlanSteps(
+            steps.filter((step): step is string => typeof step === "string"),
+          ),
+        );
+      }
+    }
+
+    // Copilot-style stop hook: check the completion claim before accepting it.
+    // The reason comes back as an ordinary tool result, where the model's already looking.
+    if (toolName === BuiltInToolNames.TaskComplete) {
+      const reason = reasonTaskIncomplete(
+        state.session.history,
+        state.session.agentPlanTargets,
+        state.session.agentVerifyTargets,
+        state.session.agentPlanSteps,
+      );
+      if (reason) {
+        dispatch(
+          updateToolCallOutput({
+            toolCallId,
+            contextItems: [
+              {
+                icon: "problems",
+                name: "Task Not Complete",
+                description: "Work remains",
+                content: reason,
+                hidden: false,
+              },
+            ],
+          }),
+        );
+        dispatch(errorToolCall({ toolCallId }));
+        unwrapResult(
+          await dispatch(streamResponseAfterToolCall({ toolCallId })),
+        );
+        return;
+      }
     }
 
     dispatch(
@@ -191,7 +225,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
         output = result.content.contextItems;
         errorMessage = result.content.errorMessage;
       }
-      streamResponse = true;
+      streamResponse = toolName !== BuiltInToolNames.TaskComplete;
     }
 
     if (errorMessage) {
@@ -210,12 +244,35 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
         }),
       );
     } else if (output?.length) {
+      // The result alone doesn't tell the model it has seen this before - each
+      // turn it mostly attends to the newest tool result, not to the pattern
+      // of what it already tried. Saying so explicitly, next to the answer, is
+      // what turns a repeat into a signal instead of just more of the same.
+      const repeatNotice: ContextItem[] =
+        identicalCalls > 0
+          ? [
+              {
+                icon: "problems",
+                name: "Repeated Tool Call",
+                description: "Already called",
+                content: `You have already called ${toolName} with exactly these arguments ${identicalCalls} time(s) in this task, and the result above is the same as before. Nothing has changed and calling it again will not change it. Use what you already have and take the next concrete action.`,
+                hidden: false,
+              },
+            ]
+          : [];
       dispatch(
         updateToolCallOutput({
           toolCallId,
-          contextItems: output,
+          contextItems: [...output, ...repeatNotice],
         }),
       );
+    }
+
+    // The terminal state: mark it done and let the turn end. Streaming a
+    // further response here would start the loop over, which is the one thing
+    // an explicit completion signal exists to prevent.
+    if (toolName === BuiltInToolNames.TaskComplete && !errorMessage) {
+      dispatch(acceptToolCall({ toolCallId }));
     }
 
     if (streamResponse) {

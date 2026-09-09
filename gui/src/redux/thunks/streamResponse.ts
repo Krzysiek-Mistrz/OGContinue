@@ -5,8 +5,15 @@ import { constructMessages } from "core/llm/constructMessages";
 import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
 import { getBaseSystemMessage } from "../../util";
+import { withTaskStateRecitation } from "../../util/taskStateRecitation";
+import {
+  extractTaskTargets,
+  extractVerifyTargets,
+} from "../../util/extractFilePathMentions";
+import { renderChatMessage } from "core/util/messageContent";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
+  setAgentPlanTargets,
   submitEditorAndInitAtIndex,
   updateHistoryItemAtIndex,
 } from "../slices/sessionSlice";
@@ -89,13 +96,34 @@ export const streamResponseThunk = createAsyncThunk<
         const updatedHistory = getState().session.history;
         const messageMode = getState().session.mode
 
+        // ground truth from the user's own request, not the model's narration -
+        // overwritten every new message, since that means a new/updated task
+        const requestText = renderChatMessage({ role: "user", content });
+        dispatch(
+          setAgentPlanTargets(
+            messageMode === "agent"
+              ? {
+                  change: extractTaskTargets(requestText),
+                  verify: extractVerifyTargets(requestText),
+                }
+              : { change: [], verify: [] },
+          ),
+        );
+
         const baseChatOrAgentSystemMessage = getBaseSystemMessage(selectedChatModel, messageMode)
 
-        const messages = constructMessages(
+        const messages = withTaskStateRecitation(
+          constructMessages(
+            messageMode,
+            [...updatedHistory],
+            baseChatOrAgentSystemMessage,
+            state.config.config.rules,
+          ),
           messageMode,
-          [...updatedHistory],
-          baseChatOrAgentSystemMessage,
-          state.config.config.rules,
+          updatedHistory,
+          getState().session.agentPlanTargets,
+          getState().session.agentVerifyTargets,
+          getState().session.agentPlanSteps,
         );
 
         posthog.capture("step run", {

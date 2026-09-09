@@ -1,90 +1,227 @@
 import { unwrapResult } from "@reduxjs/toolkit";
-import { ChatMessage, RuleWithSource } from "core";
+import {
+  ChatHistoryItem,
+  ChatMessage,
+  RuleWithSource,
+  ToolStatus,
+} from "core";
 import { constructMessages } from "core/llm/constructMessages";
+import { BuiltInToolNames } from "core/tools/builtIn";
 import { renderChatMessage } from "core/util/messageContent";
 import { getBaseSystemMessage } from "../../util";
+import { extractFilePathMentions } from "../../util/extractFilePathMentions";
+import { buildNudgeMessage, resolvedPathFor } from "../../util/agentNudge";
+import {
+  collectTaskProgress,
+  withTaskStateRecitation,
+} from "../../util/taskStateRecitation";
 import { selectSelectedChatModel } from "../slices/configSlice";
+import { appendAssistantNotice } from "../slices/sessionSlice";
 import { AppThunkDispatch, RootState } from "../store";
+import {
+  applyUnappliedCodeBlock,
+  recoverDescribedAction,
+} from "./recoverDescribedAction";
 import { streamNormalInput } from "./streamNormalInput";
 
-/**
- * Small local models frequently answer by describing the step they are about
- * to take and then stopping, instead of taking it. Nudging them once gets them
- * moving again; measured on qwen2.5-coder 7B this turned 0/4 tool calls into
- * 4/4. A system-role nudge had no effect at all.
- *
- * The nudge is only sent for a response that announces a next action, so a
- * genuine "the task is done" answer is left alone. It is also sent for a
- * response that looks like a tool call the provider's own recovery couldn't
- * parse
- */
-const NUDGE_MESSAGE: ChatMessage = {
-  role: "user",
-  content:
-    "Continue. Carry out the step you just described by calling the appropriate tool now. Do not reply with text.",
-};
-
+// A small model often describes its next step and stops instead of taking
+// it, even with DEFAULT_AGENT_SYSTEM_MESSAGE telling it not to - a genuine
+// instruction-following ceiling no nudge wording fully closes. So "what's
+// left" comes from session.agentPlanTargets (ground truth from the user's
+// own request, see streamResponse.ts), checked against what tool calls
+// actually did - not the model's own account of its progress. With no plan
+// (single-file task, fresh message), falls back to narration + phrasing.
 const ANNOUNCES_NEXT_STEP =
   /\b(let'?s|let us|i'?ll|i will|next[,:]?\s|now[,:]?\s+(?:i|we|let)|we (?:need to|should|can|will)|first[,:]?\s|start by)\b/i;
 
-// Any text after streaming finished is almost certainly a
-// tool call that fell through recovery, not prose the user is meant to read.
+// leftover text like this is almost certainly a tool call recovery missed
 const LOOKS_LIKE_UNRECOVERED_TOOL_CALL = /\{\s*"[A-Za-z0-9_]+"\s*:/;
 
-/**
- * Re-streams once with the nudge appended when the model ended its turn on an
- * announcement rather than a tool call. Applies to a response to a plain user
- * message just as much as to one following a tool result - a model stalls the
- * same way in both, and only the latter used to be covered.
- */
+// only trusted when there's no plan, or every plan target's been touched
+const SOUNDS_DONE =
+  /\b(all (set|done)|already (done|fixed|complete|correct)|task(?:'?s| is) (now )?(complete|done|finished)|nothing (else|further|more) (to|needs)|no (further|more|additional) (action|changes|steps|fixes)(?: (?:is|are) needed)?|fully fixed|everything (?:looks|is|has been) (?:good|fine|fixed|resolved|corrected)|(?:fix|change|edit)(?:es)? (?:is|are|have been) complete)\b/i;
+
+const MAX_NUDGE_ATTEMPTS = 2;
+
+// reading/grepping/listing is how a target is started, not finished
+const MUTATING_TOOLS: string[] = [
+  BuiltInToolNames.EditExistingFile,
+  BuiltInToolNames.CreateNewFile,
+];
+
+// errored/canceled left the file unchanged - target's still outstanding
+const SUCCEEDED: ToolStatus[] = ["calling", "done"];
+
+/** Plan targets no successful file-changing tool call has covered yet. */
+function remainingPlanTargets(
+  planTargets: string[],
+  history: ChatHistoryItem[],
+): string[] {
+  if (planTargets.length === 0) {
+    return [];
+  }
+  const editedArgsText = history
+    .map((item) => item.toolCallState)
+    .filter(
+      (state): state is NonNullable<typeof state> =>
+        !!state &&
+        MUTATING_TOOLS.includes(state.toolCall.function.name) &&
+        SUCCEEDED.includes(state.status),
+    )
+    .map((state) => JSON.stringify(state.parsedArgs ?? {}))
+    .join(" ");
+  return planTargets.filter((target) => !editedArgsText.includes(target));
+}
+
+/** Re-streams with a targeted nudge, up to MAX_NUDGE_ATTEMPTS; posts a visible notice if all fail. */
 export async function nudgeStalledAgent({
   dispatch,
   getState,
   historyLengthBeforeStream,
   rules,
+  afterToolCall = false,
 }: {
   dispatch: AppThunkDispatch;
   getState: () => RootState;
   historyLengthBeforeStream: number;
   rules: RuleWithSource[];
+  afterToolCall?: boolean;
 }): Promise<void> {
-  const state = getState();
-
-  if (state.session.mode !== "agent") {
+  if (getState().session.mode !== "agent") {
     return;
   }
 
-  const history = state.session.history;
-  const producedToolCall = history
-    .slice(historyLengthBeforeStream)
-    .some((item) => !!item.toolCallState);
-
-  if (producedToolCall) {
-    return;
-  }
-
-  const stalledResponse = renderChatMessage(history[history.length - 1]?.message);
+  // unapplied work regardless of how the turn ended - check before stall handling
   if (
-    !ANNOUNCES_NEXT_STEP.test(stalledResponse) &&
-    !LOOKS_LIKE_UNRECOVERED_TOOL_CALL.test(stalledResponse)
+    await applyUnappliedCodeBlock({
+      dispatch,
+      getState,
+      historyLengthBeforeStream,
+    })
   ) {
     return;
   }
 
-  const selectedChatModel = selectSelectedChatModel(state);
-  if (!selectedChatModel) {
-    return;
+  let lastTarget: string | undefined;
+
+  for (let attempt = 0; attempt < MAX_NUDGE_ATTEMPTS; attempt++) {
+    const state = getState();
+    const history = state.session.history;
+    const producedToolCall = history
+      .slice(historyLengthBeforeStream)
+      .some((item) => !!item.toolCallState);
+
+    if (producedToolCall) {
+      return;
+    }
+
+    const stalledResponse = renderChatMessage(
+      history[history.length - 1]?.message,
+    );
+    const pending = remainingPlanTargets(
+      state.session.agentPlanTargets,
+      history,
+    );
+
+    // every target changed = strongest evidence the task's done, stronger than
+    // anything the model says. But an unverified outcome check still counts
+    // as unfinished work.
+    const unverified = collectTaskProgress(
+      history,
+      state.session.agentPlanTargets,
+      state.session.agentVerifyTargets,
+    ).unverified;
+
+    if (
+      state.session.agentPlanTargets.length > 0 &&
+      pending.length === 0 &&
+      unverified.length === 0
+    ) {
+      return;
+    }
+
+    // With no plan to check against, a "sounds done" claim is all there is.
+    if (pending.length === 0 && SOUNDS_DONE.test(stalledResponse)) {
+      return;
+    }
+
+    // deliberately not a standalone trigger - every target's unfinished at the
+    // start of a task, so this only sharpens a nudge already justified
+    const shouldNudge =
+      afterToolCall ||
+      ANNOUNCES_NEXT_STEP.test(stalledResponse) ||
+      LOOKS_LIKE_UNRECOVERED_TOOL_CALL.test(stalledResponse);
+
+    if (!shouldNudge) {
+      return;
+    }
+
+    // prefer doing the thing over asking for it
+    if (await recoverDescribedAction({ dispatch, getState, pending })) {
+      return;
+    }
+
+    const selectedChatModel = selectSelectedChatModel(state);
+    if (!selectedChatModel) {
+      return;
+    }
+
+    // ground truth beats guessing from the model's own text
+    lastTarget = pending[0] ?? extractFilePathMentions(stalledResponse).at(-1);
+
+    // never written into session history - the user doesn't see this
+    const nudgedMessages = withTaskStateRecitation(
+      constructMessages(
+        state.session.mode,
+        [...history],
+        getBaseSystemMessage(selectedChatModel, state.session.mode),
+        rules,
+      ),
+      state.session.mode,
+      history,
+      state.session.agentPlanTargets,
+      state.session.agentVerifyTargets,
+      state.session.agentPlanSteps,
+    ).concat(
+      buildNudgeMessage(
+        lastTarget,
+        lastTarget ? resolvedPathFor(lastTarget, history) : undefined,
+        pending.length === 0 ? unverified[0] : undefined,
+      ),
+    );
+
+    unwrapResult(
+      await dispatch(streamNormalInput({ messages: nudgedMessages })),
+    );
   }
 
-  // Kept out of the session history so the user never sees it.
-  const nudgedMessages = constructMessages(
-    state.session.mode,
-    [...history],
-    getBaseSystemMessage(selectedChatModel, state.session.mode),
-    rules,
-  ).concat(NUDGE_MESSAGE);
+  const finalState = getState();
+  const finalHistory = finalState.session.history;
+  const stillNoToolCall = !finalHistory
+    .slice(historyLengthBeforeStream)
+    .some((item) => !!item.toolCallState);
 
-  unwrapResult(
-    await dispatch(streamNormalInput({ messages: nudgedMessages })),
-  );
+  if (afterToolCall && stillNoToolCall) {
+    const stillPending = remainingPlanTargets(
+      finalState.session.agentPlanTargets,
+      finalHistory,
+    );
+    const stillUnverified = collectTaskProgress(
+      finalHistory,
+      finalState.session.agentPlanTargets,
+      finalState.session.agentVerifyTargets,
+    ).unverified;
+    const target = stillPending[0] ?? lastTarget;
+    const shownPath = target
+      ? (resolvedPathFor(target, finalHistory) ?? target)
+      : undefined;
+
+    let notice = `⚠️ The agent stopped without finishing this task and didn't call a tool despite being asked to continue. Ask it to continue, or check what's left yourself.`;
+    if (stillPending.length === 0 && stillUnverified.length) {
+      notice = `⚠️ The agent made every change this task asked for but never checked that **${stillUnverified[0]}** works, which the request also asked for. Run it yourself, or ask the agent to.`;
+    } else if (shownPath) {
+      notice = `⚠️ The agent stopped without editing **${shownPath}**, which this task named. It may not have needed a change - check it yourself, or ask the agent to continue.`;
+    }
+    dispatch(appendAssistantNotice(notice));
+  }
 }

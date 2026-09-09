@@ -7,6 +7,48 @@ async function* toAsyncIterable(
   }
 }
 
+// Time between chunks, not the whole request - a slow model loading into VRAM
+// can take minutes for its first token. This only trips on total silence
+// after that, a strong sign the server actually died rather than being slow.
+const STREAM_STALL_TIMEOUT_MS = 3 * 60 * 1000;
+
+export class StreamStallError extends Error {
+  constructor(timeoutMs: number) {
+    super(
+      `No response from the model for ${Math.round(timeoutMs / 1000)}s - the request appears to have stalled. Try again, or check that the model server is still running.`,
+    );
+    this.name = "StreamStallError";
+  }
+}
+
+export async function* withStallTimeout<T>(
+  iterable: AsyncIterable<T>,
+  timeoutMs: number,
+): AsyncGenerator<T> {
+  const iterator = iterable[Symbol.asyncIterator]();
+  while (true) {
+    let timeoutHandle: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new StreamStallError(timeoutMs)),
+        timeoutMs,
+      );
+    });
+
+    let result: IteratorResult<T>;
+    try {
+      result = await Promise.race([iterator.next(), timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutHandle!);
+    }
+
+    if (result.done) {
+      return;
+    }
+    yield result.value;
+  }
+}
+
 export async function* streamResponse(
   response: Response,
 ): AsyncGenerator<string> {
@@ -24,8 +66,9 @@ export async function* streamResponse(
   if (nodeMajorVersion >= 20) {
     // Use the new API for Node 20 and above
     const stream = (ReadableStream as any).from(response.body);
-    for await (const chunk of stream.pipeThrough(
-      new TextDecoderStream("utf-8"),
+    for await (const chunk of withStallTimeout<string>(
+      stream.pipeThrough(new TextDecoderStream("utf-8")),
+      STREAM_STALL_TIMEOUT_MS,
     )) {
       yield chunk;
     }
@@ -34,7 +77,10 @@ export async function* streamResponse(
     // Streaming with this method doesn't work as version 20+ does
     const decoder = new TextDecoder("utf-8");
     const nodeStream = response.body as unknown as NodeJS.ReadableStream;
-    for await (const chunk of toAsyncIterable(nodeStream)) {
+    for await (const chunk of withStallTimeout(
+      toAsyncIterable(nodeStream),
+      STREAM_STALL_TIMEOUT_MS,
+    )) {
       yield decoder.decode(chunk, { stream: true });
     }
   }

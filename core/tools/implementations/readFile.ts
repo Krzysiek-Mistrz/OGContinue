@@ -50,7 +50,7 @@ export const readFileImpl: ToolImpl = async (args, extras) => {
   const fullContent = await extras.ide.readFile(resolvedUri);
   const content =
     fullContent.length > MAX_REPORTED_FILE_CHARS
-      ? `${fullContent.slice(0, MAX_REPORTED_FILE_CHARS)}\n\n[Truncated: showing the first ${MAX_REPORTED_FILE_CHARS} of ${fullContent.length} characters. Use grep search to find a specific part of this file, or read it again with a narrower request.]`
+      ? `${fullContent.slice(0, MAX_REPORTED_FILE_CHARS)}\n\n[Truncated: showing the first ${MAX_REPORTED_FILE_CHARS} of ${fullContent.length} characters. Use grep search to find a specific part of this file, or read it again with a narrower request. You have NOT seen this whole file, so do not rewrite it in full - edit it with a partial change that leaves the unseen part alone.]`
       : fullContent;
 
   return [

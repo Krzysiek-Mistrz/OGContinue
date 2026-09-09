@@ -10,6 +10,8 @@ export enum BuiltInToolNames {
   ViewDiff = "builtin_view_diff",
   LSTool = "builtin_ls",
   CreateRuleBlock = "builtin_create_rule_block",
+  TaskComplete = "builtin_task_complete",
+  SetTaskPlan = "builtin_set_task_plan",
 
   // excluded from allTools for now
   ViewRepoMap = "builtin_view_repo_map",

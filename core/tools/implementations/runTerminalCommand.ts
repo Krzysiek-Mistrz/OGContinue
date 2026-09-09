@@ -7,21 +7,19 @@ import { resolveRelativePathInDir, resolveWorkspacePath } from "../../util/ideUt
 import { isProcessBackgrounded, removeBackgroundedProcess } from "../../util/processTerminalBackgroundStates";
 import { findUriInDirs } from "../../util/uri";
 
-/**
- * Commands run from the workspace root, but the model has usually just been
- * reading a file somewhere below it and writes paths relative to that file
- * instead. The resulting "No such file or directory" names the path it tried,
- * which small models read as "the file is missing" - one went on to recreate a
- * file that already existed. So on failure, say where the command actually ran
- * and where the paths it named really are.
- */
+// Commands run from the workspace root, but the model writes paths relative
+// to whatever file it was last reading - on failure, say where it actually ran.
 const MAX_PATH_HINTS = 3;
+
+// A path-looking token in a command: either something with a slash, or a bare
+// filename with an extension.
+const TOKEN_PATTERN = /[\w.-]*\/[\w./-]+|\b[\w-]+\.[A-Za-z0-9]+\b/g;
 
 async function describeWrongPaths(
   command: string,
   extras: Parameters<ToolImpl>[1],
 ): Promise<string> {
-  const tokens = command.match(/[\w.-]*\/[\w./-]+|\b[\w-]+\.[A-Za-z0-9]+\b/g);
+  const tokens = command.match(TOKEN_PATTERN);
   if (!tokens) {
     return "";
   }
@@ -51,6 +49,53 @@ async function describeWrongPaths(
   return hints.join("\n");
 }
 
+/** Corrected command, or undefined - telling the model the right path wasn't enough, it just reissued the wrong one. */
+async function correctedCommand(
+  command: string,
+  extras: Parameters<ToolImpl>[1],
+): Promise<{ command: string; note: string } | undefined> {
+  const tokens = command.match(TOKEN_PATTERN);
+  if (!tokens) {
+    return undefined;
+  }
+
+  const dirs = await extras.ide.getWorkspaceDirs();
+  let corrected = command;
+  const fixed: string[] = [];
+
+  for (const token of new Set(tokens)) {
+    if (await resolveRelativePathInDir(token, extras.ide, dirs)) {
+      continue;
+    }
+    const resolved = await resolveWorkspacePath(token, extras.ide);
+    if (!resolved) {
+      continue;
+    }
+    const { relativePathOrBasename } = findUriInDirs(resolved, dirs);
+    if (!relativePathOrBasename || relativePathOrBasename === token) {
+      continue;
+    }
+    corrected = corrected.split(token).join(relativePathOrBasename);
+    fixed.push(`${token} -> ${relativePathOrBasename}`);
+  }
+
+  return fixed.length
+    ? {
+        command: corrected,
+        note: `The command failed because of a wrong path, so it was retried with the path corrected (${fixed.join(", ")}). Use the corrected path from now on.`,
+      }
+    : undefined;
+}
+
+// Retrying is only safe when nothing ran - a command that got partway through
+// may have done half its work, and retrying would compound that.
+const NOTHING_RAN =
+  /no such file or directory|can'?t open file|cannot find the (?:path|file)|not found|No such file/i;
+
+// retrying reruns an approved command with args the user never saw - fine for
+// running something, not fine for anything destructive
+const NEVER_RETRY = /(^|[|&;\s])(rm|rmdir|mv|dd|truncate|shred|mkfs)(\s|$)|>/;
+
 async function withPathHints(
   output: string,
   command: string,
@@ -69,7 +114,7 @@ async function withPathHints(
 
 const asyncExec = util.promisify(childProcess.exec);
 
-export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
+const runTerminalCommandOnce: ToolImpl = async (args, extras) => {
   // Default to waiting for completion if not specified
   const waitForCompletion = args.waitForCompletion !== false;
   const ideInfo = await extras.ide.getIdeInfo();
@@ -343,3 +388,34 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
     },
   ];
 }
+
+function failed(items: Awaited<ReturnType<ToolImpl>>): boolean {
+  return items.some((item) => item.status?.startsWith("Command failed"));
+}
+
+/** Runs the command; if it failed only on a wrong path, corrects it and retries once. */
+export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
+  const result = await runTerminalCommandOnce(args, extras);
+  if (!failed(result)) {
+    return result;
+  }
+
+  const output = result.map((item) => item.content).join("\n");
+  if (!NOTHING_RAN.test(output) || NEVER_RETRY.test(args.command)) {
+    return result;
+  }
+
+  const correction = await correctedCommand(args.command, extras);
+  if (!correction) {
+    return result;
+  }
+
+  const retried = await runTerminalCommandOnce(
+    { ...args, command: correction.command },
+    extras,
+  );
+  return retried.map((item) => ({
+    ...item,
+    content: `${correction.note}\n\n$ ${correction.command}\n${item.content}`,
+  }));
+};

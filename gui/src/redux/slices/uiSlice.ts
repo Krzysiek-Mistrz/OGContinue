@@ -28,6 +28,28 @@ type UIState = {
 
 export const DEFAULT_TOOL_SETTING: ToolPolicy = "allowedWithPermission";
 
+/**
+ * Whether a tool may run without asking the user first.
+ *
+ * task_complete is always allowed, never consulted against the stored
+ * policies. It has no side effects - it ends the turn - so a prompt for it
+ * would be a click on every single turn for nothing. It also could not rely
+ * on the default below even if that were acceptable: toolSettings is
+ * persisted and reconciled with autoMergeLevel2, which replaces the whole
+ * object, so a newly added default never reaches anyone who has used the
+ * extension before.
+ */
+export function isAutoApprovedTool(
+  toolName: string,
+  policies: ToolPolicies,
+): boolean {
+  return (
+    toolName === BuiltInToolNames.TaskComplete ||
+    toolName === BuiltInToolNames.SetTaskPlan ||
+    policies[toolName] === "allowedWithoutPermission"
+  );
+}
+
 export const uiSlice = createSlice({
   name: "ui",
   initialState: {
@@ -49,6 +71,8 @@ export const uiSlice = createSlice({
       [BuiltInToolNames.ViewDiff]: "allowedWithoutPermission",
       [BuiltInToolNames.LSTool]: "allowedWithoutPermission",
       [BuiltInToolNames.CreateRuleBlock]: "allowedWithPermission",
+      [BuiltInToolNames.TaskComplete]: "allowedWithoutPermission",
+      [BuiltInToolNames.SetTaskPlan]: "allowedWithoutPermission",
     },
     toolGroupSettings: {
       [BUILT_IN_GROUP_NAME]: "include",

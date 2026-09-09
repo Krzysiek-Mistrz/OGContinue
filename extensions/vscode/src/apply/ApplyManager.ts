@@ -1,5 +1,9 @@
 import { ConfigHandler } from "core/config/ConfigHandler";
 import { applyCodeBlock } from "core/edit/lazy/applyCodeBlock";
+import {
+  inferResolvedUriFromRelativePath,
+  resolveWorkspacePath,
+} from "core/util/ideUtils";
 import { getUriPathBasename } from "core/util/uri";
 import * as vscode from "vscode";
 
@@ -67,12 +71,26 @@ export class ApplyManager {
     }
   }
 
+  // Used to only open a file it had just created, leaving an existing one to
+  // land wherever was focused - and used the path raw, which a code block's
+  // info string gives partial ("report/format.py" for the real, longer path),
+  // so it wrote an empty file at the made-up path. Resolves tolerantly now,
+  // like every other tool.
   private async ensureFileOpen(filepath: string): Promise<void> {
-    const fileExists = await this.ide.fileExists(filepath);
-    if (!fileExists) {
-      await this.ide.writeFile(filepath, "");
-      await this.ide.openFile(filepath);
+    const resolved = await resolveWorkspacePath(filepath, this.ide);
+    if (resolved) {
+      await this.ide.openFile(resolved);
+      return;
     }
+
+    // Genuinely not in the workspace yet - create it, but under the folder it
+    // names rather than wherever a bare relative path happens to point.
+    const newFileUri = await inferResolvedUriFromRelativePath(
+      filepath,
+      this.ide,
+    );
+    await this.ide.writeFile(newFileUri, "");
+    await this.ide.openFile(newFileUri);
     await this.ide.openFile(filepath);
   }
 

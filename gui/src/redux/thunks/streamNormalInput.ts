@@ -5,6 +5,7 @@ import { ToCoreProtocol } from "core/protocol";
 import { selectActiveTools } from "../selectors/selectActiveTools";
 import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
+import { isAutoApprovedTool } from "../slices/uiSlice";
 import {
   abortStream,
   addPromptCompletionPair,
@@ -94,17 +95,6 @@ export const streamNormalInput = createAsyncThunk<
             },
           });
         }
-        // else if (state.session.mode === "edit") {
-        //   extra.ideMessenger.post("devdata/log", {
-        //     name: "editInteraction",
-        //     data: {
-        //       prompt: next.value.prompt,
-        //       completion: next.value.completion,
-        //       modelProvider: selectedChatModel.provider,
-        //       modelTitle: selectedChatModel.title,
-        //     },
-        //   });
-        // }
       } catch (e) {
         console.error("Failed to send dev data interaction log", e);
       }
@@ -122,8 +112,7 @@ export const streamNormalInput = createAsyncThunk<
       );
 
       if (
-        toolSettings[toolCallState.toolCall.function.name] ===
-        "allowedWithoutPermission"
+        isAutoApprovedTool(toolCallState.toolCall.function.name, toolSettings)
       ) {
         const response = await dispatch(callCurrentTool());
         unwrapResult(response);

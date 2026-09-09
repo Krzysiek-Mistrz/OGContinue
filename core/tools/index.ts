@@ -8,6 +8,8 @@ import { readCurrentlyOpenFileTool } from "./definitions/readCurrentlyOpenFile";
 import { readFileTool } from "./definitions/readFile";
 import { runTerminalCommandTool } from "./definitions/runTerminalCommand";
 import { searchWebTool } from "./definitions/searchWeb";
+import { setTaskPlanTool } from "./definitions/setTaskPlan";
+import { taskCompleteTool } from "./definitions/taskComplete";
 import { viewDiffTool } from "./definitions/viewDiff";
 
 export const allTools = [
@@ -22,6 +24,8 @@ export const allTools = [
   lsTool,
   createRuleBlock,
   searchWebTool,
+  setTaskPlanTool,
+  taskCompleteTool,
   // replacing with ls tool for now
   // viewSubdirectoryTool,
   // viewRepoMapTool,

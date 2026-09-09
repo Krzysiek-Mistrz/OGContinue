@@ -135,6 +135,12 @@ export class VsCodeExtension {
     );
     resolveVerticalDiffManager?.(this.verticalDiffManager);
 
+    // Lets readFile see a file with a pending diff as it will be once
+    // accepted, rather than with blank placeholders where lines were removed.
+    this.ide.setPendingDiffBlockLookup((fileUri) =>
+      this.verticalDiffManager.fileUriToCodeLens.get(fileUri),
+    );
+
     setupRemoteConfigSync(
       this.configHandler.reloadConfig.bind(this.configHandler),
     );

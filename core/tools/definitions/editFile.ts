@@ -30,7 +30,7 @@ export const editFileTool: Tool = {
         changes: {
           type: "string",
           description:
-            "Any modifications to the file, showing only needed changes. Do NOT wrap this in a codeblock or write anything besides the code changes. In larger files, use brief language-appropriate placeholders for large unmodified sections, e.g. '// ... existing code ...'",
+            "The file's COMPLETE new content after your changes are applied - not a diff or snippet. Do NOT wrap this in a codeblock, and do NOT use placeholders like '// ... existing code ...' for unchanged sections - write out the whole file, changed and unchanged parts alike. A partial edit with placeholders has to be merged into the file by a second, slower model call that can fail or stall; the complete file is applied instantly and deterministically instead.",
         },
       },
     },

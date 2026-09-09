@@ -3,6 +3,7 @@ import { ChatMessage } from "core";
 import { constructMessages } from "core/llm/constructMessages";
 import { renderContextItems } from "core/util/messageContent";
 import { getBaseSystemMessage } from "../../util";
+import { withTaskStateRecitation } from "../../util/taskStateRecitation";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   addContextItemsAtIndex,
@@ -72,11 +73,18 @@ export const streamResponseAfterToolCall = createAsyncThunk<
 
         const baseChatOrAgentSystemMessage = getBaseSystemMessage(selectedChatModel, messageMode)
         
-        const messages = constructMessages(
+        const messages = withTaskStateRecitation(
+          constructMessages(
+            messageMode,
+            [...updatedHistory],
+            baseChatOrAgentSystemMessage,
+            state.config.config.rules,
+          ),
           messageMode,
-          [...updatedHistory],
-          baseChatOrAgentSystemMessage,
-          state.config.config.rules,
+          updatedHistory,
+          getState().session.agentPlanTargets,
+          getState().session.agentVerifyTargets,
+          getState().session.agentPlanSteps,
         );
 
         unwrapResult(await dispatch(streamNormalInput({ messages })));
@@ -86,6 +94,7 @@ export const streamResponseAfterToolCall = createAsyncThunk<
           getState,
           historyLengthBeforeStream: updatedHistory.length,
           rules: state.config.config.rules,
+          afterToolCall: true,
         });
       }),
     );

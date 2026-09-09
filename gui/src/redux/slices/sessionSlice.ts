@@ -51,6 +51,18 @@ type SessionState = {
     curIndex: number;
   };
   newestToolbarPreviewForInput: Record<string, string>;
+  // File paths the user's own request named, extracted up front when an
+  // Agent-mode message is submitted - not derived from the model's own
+  // narration, which is unreliable once a multi-step task is in progress
+  // (see nudgeStalledAgent.ts). Ground truth for what the task actually
+  // covers, used to keep nudging toward concrete unfinished targets instead
+  // of a generic "continue" once one target is done.
+  agentPlanTargets: string[];
+  agentVerifyTargets: string[];
+  // The model's own plan, declared through the set_task_plan tool. Takes over
+  // from the regex-derived targets above once it exists, since it covers
+  // requests that never name a file path at all.
+  agentPlanSteps: string[];
 };
 
 const initialState: SessionState = {
@@ -68,6 +80,9 @@ const initialState: SessionState = {
   },
   lastSessionId: undefined,
   newestToolbarPreviewForInput: {},
+  agentPlanTargets: [],
+  agentVerifyTargets: [],
+  agentPlanSteps: [],
 };
 
 export const sessionSlice = createSlice({
@@ -277,6 +292,34 @@ export const sessionSlice = createSlice({
       state.streamAborter.abort();
       state.streamAborter = new AbortController();
     },
+    setAgentPlanSteps: (state, { payload }: PayloadAction<string[]>) => {
+      state.agentPlanSteps = payload;
+    },
+    setAgentPlanTargets: (
+      state,
+      { payload }: PayloadAction<{ change: string[]; verify: string[] }>,
+    ) => {
+      state.agentPlanTargets = payload.change;
+      state.agentVerifyTargets = payload.verify;
+      // A new request means a new task, so the previous plan is gone.
+      state.agentPlanSteps = [];
+    },
+    /**
+     * Appends a distinct new history item rather than merging into the
+     * model's last message (unlike streamUpdate), so an automated notice -
+     * e.g. that nudging gave up - reads as clearly separate from the
+     * model's own words instead of looking like something it said itself.
+     */
+    appendAssistantNotice: (state, { payload }: PayloadAction<string>) => {
+      state.history.push({
+        message: {
+          id: uuidv4(),
+          role: "assistant",
+          content: payload,
+        },
+        contextItems: [],
+      } as any);
+    },
     streamUpdate: (state, action: PayloadAction<ChatMessage[]>) => {
       if (state.history.length) {
         function toolCallDeltaToState(
@@ -438,6 +481,13 @@ export const sessionSlice = createSlice({
 
       state.isStreaming = false;
       state.symbols = {};
+      // Stale apply/diff state from the previous session's tool calls -
+      // keyed by toolCallIds that no longer exist once history is reset -
+      // otherwise carries over into the new chat.
+      state.codeBlockApplyStates = { states: [], curIndex: 0 };
+      state.agentPlanTargets = [];
+      state.agentVerifyTargets = [];
+      state.agentPlanSteps = [];
 
       if (payload) {
         state.history = payload.history as any;
@@ -744,6 +794,9 @@ export const {
   updateSessionMetadata,
   deleteSessionMetadata,
   setNewestToolbarPreviewForInput,
+  appendAssistantNotice,
+  setAgentPlanTargets,
+  setAgentPlanSteps,
 } = sessionSlice.actions;
 
 export const { selectIsGatheringContext } = sessionSlice.selectors;

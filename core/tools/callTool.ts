@@ -12,6 +12,8 @@ import { readCurrentlyOpenFileImpl } from "./implementations/readCurrentlyOpenFi
 import { readFileImpl } from "./implementations/readFile";
 import { runTerminalCommandImpl } from "./implementations/runTerminalCommand";
 import { searchWebImpl } from "./implementations/searchWeb";
+import { setTaskPlanImpl } from "./implementations/setTaskPlan";
+import { taskCompleteImpl } from "./implementations/taskComplete";
 import { viewDiffImpl } from "./implementations/viewDiff";
 
 async function callHttpTool(
@@ -163,6 +165,12 @@ export async function callTool(
         break;
       case BuiltInToolNames.SearchWeb:
         contextItems = await searchWebImpl(args, extras);
+        break;
+      case BuiltInToolNames.SetTaskPlan:
+        contextItems = await setTaskPlanImpl(args, extras);
+        break;
+      case BuiltInToolNames.TaskComplete:
+        contextItems = await taskCompleteImpl(args, extras);
         break;
       case BuiltInToolNames.ViewDiff:
         contextItems = await viewDiffImpl(args, extras);

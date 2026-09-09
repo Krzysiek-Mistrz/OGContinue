@@ -12,11 +12,9 @@ import { setShowDialog } from "../redux/slices/uiSlice";
 import { enterEditMode, exitEditMode } from "../redux/thunks/editMode";
 import { saveCurrentSession } from "../redux/thunks/session";
 import { fontSize, isMetaEquivalentKeyPressed } from "../util";
-import { incrementFreeTrialCount } from "../util/freeTrial";
 import { ROUTES } from "../util/navigation";
 import { FatalErrorIndicator } from "./config/FatalErrorNotice";
 import TextDialog from "./dialogs";
-import Footer from "./Footer";
 import { LumpProvider } from "./mainInput/Lump/LumpContext";
 import { useMainEditor } from "./mainInput/TipTapEditor";
 import { isNewUserOnboarding, useOnboardingCard } from "./OnboardingCard";
@@ -118,14 +116,6 @@ const Layout = () => {
       }
     },
     [location, navigate],
-  );
-
-  useWebviewListener(
-    "incrementFtc",
-    async () => {
-      incrementFreeTrialCount();
-    },
-    [],
   );
 
   useWebviewListener(
@@ -232,7 +222,6 @@ const Layout = () => {
                 <PostHogPageView />
                 <Outlet />
                 <FatalErrorIndicator />
-                <Footer />
               </GridDiv>
             </div>
             <div style={{ fontSize: fontSize(-4) }} id="tooltip-portal-div" />

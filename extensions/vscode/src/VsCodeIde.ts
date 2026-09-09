@@ -4,7 +4,6 @@ import { exec } from "node:child_process";
 import { Range } from "core";
 import { EXTENSION_NAME } from "core/control-plane/env";
 import { GetGhTokenArgs } from "core/protocol/ide";
-import { editConfigFile, getConfigJsonPath } from "core/util/paths";
 import * as URI from "uri-js";
 import * as vscode from "vscode";
 
@@ -41,6 +40,37 @@ class VsCodeIde implements IDE {
   ) {
     this.ideUtils = new VsCodeIdeUtils();
     this.secretStorage = new SecretStorage(context);
+  }
+
+  // A pending diff doesn't delete removed lines, it blanks them and keeps the
+  // old text in a decoration - so reading the buffer gives neither the old nor
+  // new file. Drop the placeholders to return the file as it'll be once accepted.
+  private pendingDiffBlocks?: (
+    fileUri: string,
+  ) => { start: number; numRed: number }[] | undefined;
+
+  public setPendingDiffBlockLookup(
+    lookup: (fileUri: string) => { start: number; numRed: number }[] | undefined,
+  ): void {
+    this.pendingDiffBlocks = lookup;
+  }
+
+  private withoutPendingDiffPlaceholders(
+    fileUri: string,
+    contents: string,
+  ): string {
+    const blocks = this.pendingDiffBlocks?.(fileUri)?.filter(
+      (block) => block.numRed > 0,
+    );
+    if (!blocks?.length) {
+      return contents;
+    }
+    const lines = contents.split("\n");
+    // Bottom-up, so removing one block doesn't shift the ones above it.
+    for (const block of [...blocks].sort((a, b) => b.start - a.start)) {
+      lines.splice(block.start, block.numRed);
+    }
+    return lines.join("\n");
   }
 
   public updateLastFileSaveTimestamp(): void {
@@ -139,62 +169,11 @@ class VsCodeIde implements IDE {
       if (!this.askedForAuth) {
         vscode.window
           .showInformationMessage(
-            "Continue will request read access to your GitHub email so that we can prevent abuse of the free trial. If you prefer not to sign in, you can use Continue with your own API keys or local model.",
+            "Continue will request read access to your GitHub email.",
             "Sign in",
-            "Use API key / local model",
-            "Learn more",
           )
           .then(async (selection) => {
-            if (selection === "Use API key / local model") {
-              await vscode.commands.executeCommand(
-                "continue.continueGUIView.focus",
-              );
-              (await this.vscodeWebviewProtocolPromise).request(
-                "openOnboardingCard",
-                undefined,
-              );
-
-              // Remove free trial models
-              editConfigFile(
-                (config) => {
-                  let tabAutocompleteModel = undefined;
-                  if (Array.isArray(config.tabAutocompleteModel)) {
-                    tabAutocompleteModel = config.tabAutocompleteModel.filter(
-                      (model) => model.provider !== "free-trial",
-                    );
-                  } else if (
-                    config.tabAutocompleteModel?.provider === "free-trial"
-                  ) {
-                    tabAutocompleteModel = undefined;
-                  }
-
-                  return {
-                    ...config,
-                    models: config.models.filter(
-                      (model) => model.provider !== "free-trial",
-                    ),
-                    tabAutocompleteModel,
-                  };
-                },
-                (config) => {
-                  return {
-                    ...config,
-                    models: config.models?.filter(
-                      (model) =>
-                        !(
-                          "provider" in model && model.provider === "free-trial"
-                        ),
-                    ),
-                  };
-                },
-              );
-            } else if (selection === "Learn more") {
-              vscode.env.openExternal(
-                vscode.Uri.parse(
-                  "https://docs.continue.dev/reference/Model%20Providers/freetrial",
-                ),
-              );
-            } else if (selection === "Sign in") {
+            if (selection === "Sign in") {
               const session = await vscode.authentication.getSession(
                 "github",
                 [],
@@ -218,37 +197,6 @@ class VsCodeIde implements IDE {
       if (session) {
         this.authToken = session.accessToken;
         return session.accessToken;
-      } else if (!this.askedForAuth) {
-        // User cancelled the login prompt
-        // Explain that they can avoid the prompt by removing free trial models from config.json
-        vscode.window
-          .showInformationMessage(
-            "We'll only ask you to log in if using the free trial. To avoid this prompt, make sure to remove free trial models from your config.json",
-            "Remove for me",
-            "Open Assistant configuration",
-          )
-          .then((selection) => {
-            if (selection === "Remove for me") {
-              editConfigFile(
-                (configJson) => {
-                  configJson.models = configJson.models.filter(
-                    (model) => model.provider !== "free-trial",
-                  );
-                  configJson.tabAutocompleteModel = undefined;
-                  return configJson;
-                },
-                (config) => {
-                  config.models = config.models?.filter(
-                    (model) =>
-                      !("provider" in model && model.provider === "free-trial"),
-                  );
-                  return config;
-                },
-              );
-            } else if (selection === "Open Assistant configuration") {
-              this.openFile(getConfigJsonPath());
-            }
-          });
       }
     } catch (error) {
       console.error("Failed to get GitHub authentication session:", error);
@@ -512,7 +460,10 @@ class VsCodeIde implements IDE {
         URI.equal(doc.uri.toString(), uri.toString()),
       );
       if (openTextDocument !== undefined) {
-        return openTextDocument.getText();
+        return this.withoutPendingDiffPlaceholders(
+          fileUri,
+          openTextDocument.getText(),
+        );
       }
 
       const fileStats = await this.ideUtils.stat(uri);

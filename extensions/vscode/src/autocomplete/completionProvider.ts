@@ -10,7 +10,6 @@ import { v4 as uuidv4 } from "uuid";
 import * as vscode from "vscode";
 
 import { handleLLMError } from "../util/errorHandling";
-import { showFreeTrialLoginMessage } from "../util/messages";
 import { VsCodeIde } from "../VsCodeIde";
 import { VsCodeWebviewProtocol } from "../webviewProtocol";
 
@@ -36,17 +35,7 @@ export class ContinueCompletionProvider
     if (await handleLLMError(e)) {
       return;
     }
-    let message = e.message;
-    if (message.includes("Please sign in with GitHub")) {
-      showFreeTrialLoginMessage(
-        message,
-        this.configHandler.reloadConfig.bind(this.configHandler),
-        () => {
-          void this.webviewProtocol.request("openOnboardingCard", undefined);
-        },
-      );
-      return;
-    }
+    const message = e.message;
     vscode.window.showErrorMessage(message, "Documentation").then((val) => {
       if (val === "Documentation") {
         vscode.env.openExternal(

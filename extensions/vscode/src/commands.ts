@@ -216,8 +216,6 @@ const getCommandsMap: (
       throw new Error("No edit or chat model selected");
     }
 
-    void sidebar.webviewProtocol.request("incrementFtc", undefined);
-
     await verticalDiffManager.streamEdit({
       input:
         config.experimental?.contextMenuPrompts?.[promptName] ?? fallbackPrompt,

@@ -8,7 +8,6 @@ import * as vscode from "vscode";
 import { IMessenger } from "../../../core/protocol/messenger";
 
 import { handleLLMError } from "./util/errorHandling";
-import { showFreeTrialLoginMessage } from "./util/messages";
 
 export class VsCodeWebviewProtocol
   implements IMessenger<FromWebviewProtocol, ToWebviewProtocol>
@@ -116,40 +115,15 @@ export class VsCodeWebviewProtocol
             }
           }
 
-          if (message.includes("https://proxy-server")) {
-            message = message.split("\n").filter((l: string) => l !== "")[1];
-            try {
-              message = JSON.parse(message).message;
-            } catch {}
-            if (message.includes("exceeded")) {
-              message +=
-                " To keep using Continue, you can set up a local model or use your own API key.";
-            }
-
-            vscode.window
-              .showInformationMessage(message, "Add API Key", "Use Local Model")
-              .then((selection) => {
-                if (selection === "Add API Key") {
-                  this.request("addApiKey", undefined);
-                } else if (selection === "Use Local Model") {
-                  this.request("setupLocalConfig", undefined);
-                }
-              });
-          } else if (message.includes("Please sign in with GitHub")) {
-            showFreeTrialLoginMessage(message, this.reloadConfig, () =>
-              this.request("openOnboardingCard", undefined),
-            );
-          } else {
-            Telemetry.capture(
-              "webview_protocol_error",
-              {
-                messageType: msg.messageType,
-                errorMsg: message.split("\n\n")[0],
-                stack: extractMinimalStackTraceInfo(e.stack),
-              },
-              false,
-            );
-          }
+          Telemetry.capture(
+            "webview_protocol_error",
+            {
+              messageType: msg.messageType,
+              errorMsg: message.split("\n\n")[0],
+              stack: extractMinimalStackTraceInfo(e.stack),
+            },
+            false,
+          );
         }
       }
     };

@@ -402,7 +402,7 @@ export async function resolveBlock(
     throw new Error(`Block ${packageIdentifierToShorthandSlug(id)} not found`);
   }
 
-  // Convert any input secrets to FQSNs (they get FQSNs as if they are in the block. This is so that we know when to use models add-on / free trial secrets)
+  // Convert any input secrets to FQSNs (they get FQSNs as if they are in the block. This is so that we know when to use models add-on secrets)
   const renderedInputs = inputsToFQSNs(inputs || {}, id);
 
   // Render template variables

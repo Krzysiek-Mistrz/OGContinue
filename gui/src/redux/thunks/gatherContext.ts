@@ -62,8 +62,6 @@ export const gatherContext = createAsyncThunk<
 
     // Automatically use currently open file
     if (!modifiers.noContext) {
-      const usingFreeTrial = selectedChatModel.provider === "free-trial";
-
       const currentFileResponse = await extra.ideMessenger.request(
         "context/getContextItems",
         {
@@ -86,16 +84,6 @@ export const gatherContext = createAsyncThunk<
               (item) => item.uri?.value && URI.equal(item.uri.value, uri),
             )
           ) {
-            // Limit to 1000 lines if using free trial
-            if (usingFreeTrial) {
-              currentFile.content = currentFile.content
-                .split("\n")
-                .slice(0, 1000)
-                .join("\n");
-              if (!currentFile.content.endsWith("```")) {
-                currentFile.content += "\n```";
-              }
-            }
             currentFile.id = {
               providerTitle: "file",
               itemId: uri,

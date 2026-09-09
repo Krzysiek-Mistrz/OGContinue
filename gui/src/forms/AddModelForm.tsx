@@ -15,22 +15,16 @@ import {
 } from "../pages/AddNewModel/configs/providers";
 import { useAppDispatch } from "../redux/hooks";
 import { updateSelectedModelByRole } from "../redux/thunks";
-import { FREE_TRIAL_LIMIT_REQUESTS, hasPassedFTL } from "../util/freeTrial";
 
 interface QuickModelSetupProps {
   onDone: () => void;
-  hideFreeTrialLimitMessage?: boolean;
 }
 
 const MODEL_PROVIDERS_URL =
   "https://docs.continue.dev/customize/model-providers";
 const CODESTRAL_URL = "https://console.mistral.ai/codestral";
-const CONTINUE_SETUP_URL = "https://docs.continue.dev/setup/overview";
 
-function AddModelForm({
-  onDone,
-  hideFreeTrialLimitMessage,
-}: QuickModelSetupProps) {
+function AddModelForm({ onDone }: QuickModelSetupProps) {
   const [selectedProvider, setSelectedProvider] = useState<ProviderInfo>(
     providers["openai"]!,
   );
@@ -54,7 +48,7 @@ function AddModelForm({
   ];
 
   const allProviders = Object.entries(providers)
-    .filter(([key]) => !["freetrial", "openai-aiohttp"].includes(key))
+    .filter(([key]) => key !== "openai-aiohttp")
     .map(([, provider]) => provider)
     .filter((provider) => !!provider)
     .map((provider) => provider!); // for type checking
@@ -74,10 +68,7 @@ function AddModelForm({
     : selectedProvider.apiKeyUrl;
 
   function isDisabled() {
-    if (
-      selectedProvider.downloadUrl ||
-      selectedProvider.provider === "free-trial"
-    ) {
+    if (selectedProvider.downloadUrl) {
       return false;
     }
 
@@ -138,20 +129,6 @@ function AddModelForm({
       <form onSubmit={formMethods.handleSubmit(onSubmit)}>
         <div className="mx-auto max-w-md p-6">
           <h1 className="mb-0 text-center text-2xl">Add Chat model</h1>
-          {!hideFreeTrialLimitMessage && hasPassedFTL() && (
-            <p className="text-sm text-gray-400">
-              You've reached the free trial limit of {FREE_TRIAL_LIMIT_REQUESTS}{" "}
-              free inputs. To keep using Continue, you can either use your own
-              API key, or use a local LLM. To read more about the options, see
-              our{" "}
-              <a
-                onClick={() => ideMessenger.post("openUrl", CONTINUE_SETUP_URL)}
-              >
-                documentation
-              </a>
-              .
-            </p>
-          )}
 
           <div className="my-8 flex flex-col gap-6">
             <div>

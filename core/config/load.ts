@@ -46,7 +46,6 @@ import { useHub } from "../control-plane/env";
 import { BaseLLM } from "../llm";
 import { LLMClasses, llmFromDescription } from "../llm/llms";
 import CustomLLMClass from "../llm/llms/CustomLLM";
-import FreeTrial from "../llm/llms/FreeTrial";
 import { LLMReranker } from "../llm/llms/llm";
 import TransformersJsEmbeddingsProvider from "../llm/llms/TransformersJsEmbeddingsProvider";
 import { slashCommandFromPromptFileV1 } from "../promptFiles/v1/slashCommandFromPromptFile";
@@ -237,7 +236,6 @@ async function intermediateToFinalConfig({
   llmLogger,
   workOsAccessToken,
   loadPromptFiles = true,
-  allowFreeTrial = true,
 }: {
   config: Config;
   ide: IDE;
@@ -247,12 +245,11 @@ async function intermediateToFinalConfig({
   llmLogger: ILLMLogger;
   workOsAccessToken: string | undefined;
   loadPromptFiles?: boolean;
-  allowFreeTrial?: boolean;
 }): Promise<{ config: ContinueConfig; errors: ConfigValidationError[] }> {
   const errors: ConfigValidationError[] = [];
 
   // Auto-detect models
-  let models: BaseLLM[] = [];
+  const models: BaseLLM[] = [];
   await Promise.all(
     config.models.map(async (desc) => {
       if ("title" in desc) {
@@ -336,22 +333,6 @@ async function intermediateToFinalConfig({
     "summarize",
   ]); // Default to chat role if not specified
 
-  if (allowFreeTrial) {
-    // Obtain auth token (iff free trial being used)
-    const freeTrialModels = models.filter(
-      (model) => model.providerName === "free-trial",
-    );
-    if (freeTrialModels.length > 0) {
-      const ghAuthToken = await ide.getGitHubAuthToken({});
-      for (const model of freeTrialModels) {
-        (model as FreeTrial).setupGhAuthToken(ghAuthToken);
-      }
-    }
-  } else {
-    // Remove free trial models
-    models = models.filter((model) => model.providerName !== "free-trial");
-  }
-
   // Tab autocomplete model
   let tabAutocompleteModels: BaseLLM[] = [];
   if (config.tabAutocompleteModel) {
@@ -371,14 +352,6 @@ async function intermediateToFinalConfig({
               config.completionOptions,
             );
 
-            if (llm?.providerName === "free-trial") {
-              if (!allowFreeTrial) {
-                // This shouldn't happen
-                throw new Error("Free trial cannot be used with control plane");
-              }
-              const ghAuthToken = await ide.getGitHubAuthToken({});
-              (llm as FreeTrial).setupGhAuthToken(ghAuthToken);
-            }
             return llm;
           } else {
             return new CustomLLMClass(desc);

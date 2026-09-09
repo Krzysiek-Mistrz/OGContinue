@@ -1,0 +1,3 @@
+# Bundles rebuilt by build-probe.sh from the extension's source.
+recover.cjs
+runner.cjs

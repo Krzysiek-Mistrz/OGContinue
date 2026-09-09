@@ -212,19 +212,6 @@ void (async () => {
     console.log(`[info] Copied ${path.basename(f)}`);
   }
 
-  // tree-sitter tag query files
-  // ncp(
-  //   path.join(
-  //     __dirname,
-  //     "../../../core/node_modules/llm-code-highlighter/dist/tag-qry",
-  //   ),
-  //   path.join(__dirname, "../out/tag-qry"),
-  //   (error) => {
-  //     if (error)
-  //       console.warn("Error copying code-highlighter tag-qry files", error);
-  //   },
-  // );
-
   // textmate-syntaxes
   await new Promise((resolve, reject) => {
     ncp(
@@ -440,9 +427,6 @@ void (async () => {
   validateFilesPresent([
     // Queries used to create the index for @code context provider
     "tree-sitter/code-snippet-queries/c_sharp.scm",
-
-    // Queries used for @outline and @highlights context providers
-    "tag-qry/tree-sitter-c_sharp-tags.scm",
 
     // onnx runtime bindngs
     `bin/napi-v3/${os}/${arch}/onnxruntime_binding.node`,

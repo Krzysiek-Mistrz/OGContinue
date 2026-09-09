@@ -17,7 +17,6 @@ const {
   buildGui,
   copyOnnxRuntimeFromNodeModules,
   copyTreeSitterWasms,
-  copyTreeSitterTagQryFiles,
   copyNodeModules,
   downloadEsbuildBinary,
   downloadRipgrepBinary,
@@ -98,9 +97,6 @@ async function package(target, os, arch, exe) {
   // Copy tree-sitter-wasm files
   await copyTreeSitterWasms();
 
-  // Copy tree-sitter tag query files
-  await copyTreeSitterTagQryFiles();
-
   // Install and copy over native modules
   // *** onnxruntime-node ***
   await copyOnnxRuntimeFromNodeModules(target);
@@ -150,9 +146,6 @@ async function package(target, os, arch, exe) {
   validateFilesPresent([
     // Queries used to create the index for @code context provider
     "tree-sitter/code-snippet-queries/c_sharp.scm",
-
-    // Queries used for @outline and @highlights context providers
-    "tag-qry/tree-sitter-c_sharp-tags.scm",
 
     // onnx runtime bindngs
     `bin/napi-v3/${os}/${arch}/onnxruntime_binding.node`,

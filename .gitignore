@@ -148,7 +148,6 @@ notes.md
 
 manual-testing-sandbox/.idea/**
 manual-testing-sandbox/.continue/**
-extensions/intellij/.idea/**
 
 **/.idea/workspace.xml
 **/.idea/usage.statistics.xml
@@ -157,7 +156,6 @@ extensions/intellij/.idea/**
 **/.idea/php.xml
 
 
-extensions/intellij/bin
 extensions/.continue-debug/
 
 *.vsix
@@ -168,3 +166,6 @@ extensions/.continue-debug/
 # makes it invisible to ripgrep-based file search and codebase indexing.
 !manual-testing-sandbox/agent-test-app/lib/
 binary/
+# Same reason: the eval fixture keeps a source dir under lib/, and an agent
+# cannot fix a file its own file search is not allowed to see.
+!manual-testing-sandbox/agent-eval/workspace/inventory-app/lib/

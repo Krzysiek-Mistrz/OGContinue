@@ -79,7 +79,6 @@
     "js-tiktoken": "^1.0.8",
     "jsdom": "^24.0.0",
     "launchdarkly-node-client-sdk": "^3.2.0",
-    "llm-code-highlighter": "^0.0.14",
     "lru-cache": "^11.0.2",
     "mac-ca": "^3.1.0",
     "node-fetch": "^3.3.2",

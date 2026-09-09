@@ -7,7 +7,7 @@
 </div>
 
 > **About this fork**
-> OGContinue was created because upstream Continue development had slowed down while this snapshot of the project still worked well and had few outstanding bugs. This fork exists to keep it alive, fix issues, and add functionality (working Agent mode, in-file Keep/Undo for edits, and better defaults for local-model workflows) for people who want a genuinely local AI coding assistant.
+> Upstream Continue stopped. Cursor (Anysphere) acquired the Continue team in June 2026, shipped a final `v2.0.0-vscode` release, and set the `continuedev/continue` repository to read-only; the hosted product was shut down soon after. OGContinue was forked from a snapshot well before that (`v1.0.10-vscode`), for a different reason: upstream Continue never worked reliably with local models in the first place. Agent mode in particular was built assuming a frontier-class hosted model behind every tool call, and fell apart on the small (7B-class) models people actually run locally - which is most of what this fork rebuilds. See [CHANGES.md](./CHANGES.md) for the full list.
 > Distributed under the same [Apache 2.0](./LICENSE) license as the original project. See [CHANGES.md](./CHANGES.md) for a summary of what's different from upstream.
 >
 > "Continue" and the Continue logo are trademarks of Continue Dev, Inc. This is an independent, unofficial fork; no trademark rights are claimed or implied.
@@ -29,7 +29,20 @@
 
 Upstream Continue treats local models as a secondary path — most of its polish targets hosted, API-key models. OGContinue flips that: **local models via [Ollama](https://ollama.com) are the primary target**, not an afterthought, because they were the most neglected part of the original project.
 
-Concretely, that means Chat, Autocomplete, Edit, and Agent are all made to work reliably with local models — including small (7B-class and below) ones that struggle with tool-calling and instruction-following compared to hosted frontier models. Agent mode in particular gets extra recovery logic (tolerant path resolution, stuck-loop detection with a nudge back on track, tool-call output that actually confirms a change landed) specifically because small local models trip on things large hosted models rarely do. Larger local models and hosted API-key models still work exactly as before — this is about not leaving the smaller end of the range broken.
+Concretely, that means Chat, Autocomplete, Edit, and Agent are all made to work reliably with local models — including small (7B-class and below) ones that struggle with tool-calling and instruction-following compared to hosted frontier models. Larger local models and hosted API-key models still work exactly as before — this is about not leaving the smaller end of the range broken.
+
+### How Agent mode stays reliable on small models
+
+Upstream Continue's Agent mode was built around a model reliably calling tools through the API and accurately narrating its own progress. Small local models routinely do neither — one 7B model tested against this fork's [evaluation harness](./manual-testing-sandbox/agent-eval) never used the native tool-calling API even once, printing every single call as plain text instead, and both tested models will describe a step ("Let's fix the division guard...") without actually taking it if nothing catches that. Rather than hoping a bigger system prompt fixes this, OGContinue builds around it:
+
+- **Tool calls are recovered from plain text.** If a model prints `{"name": "...", "arguments": {...}}` or a bare `tool_name {...}` instead of using the tool-calling API, it's parsed back into a real call. This isn't a rare fallback — it's the primary path for some models.
+- **The model declares its own plan**, via a `set_task_plan` tool call, for tasks the harness can't infer a plan for from the request text alone. Progress is recited against that plan at the end of every turn — restating what's done, what's left, and the next concrete action — which keeps a model from losing the thread of a multi-step task instead of relying on it to remember on its own.
+- **An explicit `task_complete` tool ends a turn**, and calling it is checked against that same progress before it's accepted — so a model can't declare the task finished while a file it was asked to change is still untouched, or a command it was asked to run has never actually succeeded.
+- **A response that only describes an edit or a next step, instead of making the tool call, is reconstructed and carried out automatically** rather than asked for again — the description usually already contains everything the call needs.
+- **The terminal tool corrects a wrong path and retries once**, instead of only telling the model where the file really is and hoping it tries again itself.
+- **File paths resolve tolerantly everywhere** — a model that gets a path slightly wrong (missing a folder, an extra one) still finds the file instead of failing outright.
+
+All of this is deliberately model-agnostic — none of it is tuned to one model's phrasing — and it's measured, not assumed: the [`agent-eval`](./manual-testing-sandbox/agent-eval) harness runs a real broken project through a real model over Ollama and checks the result behaviourally, so a change to this logic can be judged by whether it actually fixes more runs rather than by how it reads in a transcript. See [docs/LOCAL_SETUP.md](./docs/LOCAL_SETUP.md#which-models-are-actually-tested) for current results by model.
 
 ## Chat
 

@@ -1,6 +1,7 @@
 # Changelog
 
-Separate changelogs are kept for each extension:
+See the [VS Code Extension changelog](./extensions/vscode/CHANGELOG.md) — this fork
+targets VS Code only, so that's the only extension with a changelog to track.
 
-- [VS Code Extension](./extensions/vscode/CHANGELOG.md)
-- [JetBrains Extension](./extensions/intellij/CHANGELOG.md)
+For a summary of how this fork differs from upstream Continue as a whole, see
+[CHANGES.md](./CHANGES.md).

@@ -1,5 +1,13 @@
 import { getLocalStorage, setLocalStorage } from "../../util/localStorage";
-import { OnboardingCardState } from "./OnboardingCard";
+
+// activeTab is a leftover from upstream's multi-provider onboarding
+// (Quickstart/Best/Local/hub tabs). This fork only has one flow, so it's
+// kept loose-typed rather than deleted outright - HelpCenterSection still
+// passes a stale value into it, which is now simply ignored.
+export interface OnboardingCardState {
+  show?: boolean;
+  activeTab?: string;
+}
 
 // Note that there is no "NotStarted" status since the
 // local storage value is null until onboarding begins
@@ -24,7 +32,6 @@ export function isNewUserOnboarding() {
 
 export const defaultOnboardingCardState: OnboardingCardState = {
   show: false,
-  activeTab: "Quickstart",
 };
 
 export enum OllamaConnectionStatuses {

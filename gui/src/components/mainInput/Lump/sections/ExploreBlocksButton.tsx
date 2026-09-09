@@ -1,50 +1,25 @@
 import { BlockType } from "@continuedev/config-yaml";
-import {
-  ArrowTopRightOnSquareIcon,
-  PlusIcon,
-} from "@heroicons/react/24/outline";
+import { PlusIcon } from "@heroicons/react/24/outline";
 import { useContext } from "react";
 import { GhostButton } from "../../..";
-import { useAuth } from "../../../../context/Auth";
 import { IdeMessengerContext } from "../../../../context/IdeMessenger";
-import { useAppDispatch } from "../../../../redux/hooks";
 import { fontSize } from "../../../../util";
 
+// Every profile is local here - no hub to explore blocks on, so this always
+// adds a block to the local workspace config.
 export function ExploreBlocksButton(props: { blockType: string }) {
-  const { selectedProfile } = useAuth();
   const ideMessenger = useContext(IdeMessengerContext);
-  const dispatch = useAppDispatch();
 
-  const isLocal = selectedProfile?.profileType === "local";
-
-  const Icon = isLocal ? PlusIcon : ArrowTopRightOnSquareIcon;
-  const text = `${isLocal ? "Add" : "Explore"} ${
+  const text = `Add ${
     props.blockType === "mcpServers"
       ? "MCP Servers"
       : props.blockType.charAt(0).toUpperCase() + props.blockType.slice(1)
   }`;
 
   const handleClick = () => {
-    if (isLocal) {
-      ideMessenger.request("config/addLocalWorkspaceBlock", {
-        blockType: props.blockType as BlockType,
-      });
-      // switch (props.blockType) {
-      //   case "docs":
-      //     dispatch(setShowDialog(true));
-      //     dispatch(setDialogMessage(<AddDocsDialog />));
-      //     break;
-      //   default:
-      //     ideMessenger.request("config/openProfile", {
-      //       profileId: selectedProfile.id,
-      //     });
-      // }
-    } else {
-      ideMessenger.request("controlPlane/openUrl", {
-        path: `new?type=block&blockType=${props.blockType}`,
-        orgSlug: undefined,
-      });
-    }
+    ideMessenger.request("config/addLocalWorkspaceBlock", {
+      blockType: props.blockType as BlockType,
+    });
   };
 
   return (
@@ -59,7 +34,7 @@ export function ExploreBlocksButton(props: { blockType: string }) {
       }}
     >
       <div className="flex items-center justify-center gap-1">
-        <Icon className="h-3 w-3 pr-1" />
+        <PlusIcon className="h-3 w-3 pr-1" />
         <span className="text-[11px]">{text}</span>
       </div>
     </GhostButton>

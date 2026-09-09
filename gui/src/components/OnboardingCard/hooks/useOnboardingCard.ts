@@ -1,6 +1,5 @@
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { TabTitle } from "../components/OnboardingCardTabs";
 import {
   setDialogMessage,
   setOnboardingCard,
@@ -14,8 +13,8 @@ import { saveCurrentSession } from "../../../redux/thunks/session";
 export interface UseOnboardingCard {
   show: OnboardingCardState["show"];
   activeTab: OnboardingCardState["activeTab"];
-  setActiveTab: (tab: TabTitle) => void;
-  open: (tab: TabTitle) => void;
+  setActiveTab: (tab: string) => void;
+  open: (tab: string) => void;
   close: (isDialog?: boolean) => void;
 }
 
@@ -32,15 +31,14 @@ export function useOnboardingCard(): UseOnboardingCard {
 
   let show: boolean;
 
-  // Always show if we explicitly want to, e.g. passing free trial
-  // and setting up keys
+  // Always show if we explicitly want to, e.g. setting up keys
   if (onboardingCard.show) {
     show = true;
   } else {
     show = onboardingStatus !== "Completed" && !hasDismissedOnboardingCard;
   }
 
-  async function open(tab: TabTitle) {
+  async function open(tab: string) {
     navigate("/");
     dispatch(setOnboardingCard({ show: true, activeTab: tab }));
   }
@@ -54,7 +52,7 @@ export function useOnboardingCard(): UseOnboardingCard {
     }
   }
 
-  function setActiveTab(tab: TabTitle) {
+  function setActiveTab(tab: string) {
     dispatch(setOnboardingCard({ show: true, activeTab: tab }));
   }
 

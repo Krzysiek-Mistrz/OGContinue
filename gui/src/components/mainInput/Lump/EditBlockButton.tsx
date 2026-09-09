@@ -1,7 +1,6 @@
 import { ConfigYaml } from "@continuedev/config-yaml";
 import { PencilIcon } from "@heroicons/react/24/outline";
 import { useContext } from "react";
-import { useAuth } from "../../../context/Auth";
 import { IdeMessengerContext } from "../../../context/IdeMessenger";
 
 type SectionKey = Exclude<
@@ -15,35 +14,15 @@ interface EditBlockButtonProps<T extends SectionKey> {
   className?: string;
 }
 
-function isUsesBlock(block: any): block is { uses: string } {
-  return typeof block !== "string" && "uses" in block;
-}
-
+// Every profile is local here - no hub sync, so no hub-hosted block to edit
+// elsewhere. Always just opens the file.
 export default function EditBlockButton<T extends SectionKey>({
-  block,
-  blockType,
   className = "",
 }: EditBlockButtonProps<T>) {
   const ideMessenger = useContext(IdeMessengerContext);
-  const { selectedProfile } = useAuth();
-
-  const openUrl = (path: string) =>
-    ideMessenger.request("controlPlane/openUrl", {
-      path,
-      orgSlug: undefined,
-    });
 
   const handleEdit = () => {
-    if (selectedProfile?.profileType === "local") {
-      ideMessenger.post("config/openProfile", {
-        profileId: undefined,
-      });
-    } else if (block && isUsesBlock(block)) {
-      openUrl(`${block.uses}/new-version`);
-    } else if (selectedProfile?.fullSlug) {
-      const slug = `${selectedProfile.fullSlug.ownerSlug}/${selectedProfile.fullSlug.packageSlug}`;
-      openUrl(`${slug}/new-version`);
-    }
+    ideMessenger.post("config/openProfile", { profileId: undefined });
   };
 
   return (

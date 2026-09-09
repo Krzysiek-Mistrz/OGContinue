@@ -33,13 +33,10 @@ const RuleCard: React.FC<RuleCardProps> = ({ rule }) => {
   const ideMessenger = useContext(IdeMessengerContext);
   const mode = useAppSelector((store) => store.session.mode);
 
+  // rule.slug is only ever set for a hub-synced rule, which can't happen
+  // here - no hub. Local file always wins.
   const handleOpen = async () => {
-    if (rule.slug) {
-      ideMessenger.request("controlPlane/openUrl", {
-        path: `${rule.slug}/new-version`,
-        orgSlug: undefined,
-      });
-    } else if (rule.ruleFile) {
+    if (rule.ruleFile) {
       ideMessenger.post("openFile", {
         path: rule.ruleFile,
       });

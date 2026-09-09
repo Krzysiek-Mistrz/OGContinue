@@ -160,7 +160,7 @@ export default function AssistantSelect() {
   const { isToolbarExpanded } = useLump();
   const [loading, setLoading] = useState(false);
 
-  const { profiles, session, login } = useAuth();
+  const { profiles } = useAuth();
   const navigate = useNavigate();
 
   function close() {
@@ -168,11 +168,11 @@ export default function AssistantSelect() {
       buttonRef.current.click();
     }
   }
+  // Upstream opened hub.continue.dev to create a synced assistant there -
+  // dead here, no hosted backend. Creates a new local ~/.continue/assistants/
+  // file instead, which shows up as its own switchable profile.
   function onNewAssistant() {
-    ideMessenger.post("controlPlane/openUrl", {
-      path: "new",
-      orgSlug: currentOrg?.slug,
-    });
+    ideMessenger.post("config/newLocalAssistant", undefined);
     close();
   }
 
@@ -336,7 +336,7 @@ export default function AssistantSelect() {
                   className="w-full"
                   value={"new-assistant"}
                   fontSizeModifier={-2}
-                  onClick={session ? onNewAssistant : () => login(false)}
+                  onClick={onNewAssistant}
                 >
                   <div
                     className="text-lightgray flex flex-row items-center gap-2"

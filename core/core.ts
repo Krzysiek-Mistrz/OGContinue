@@ -52,6 +52,7 @@ import {
   setupLocalConfig,
   setupQuickstartConfig,
 } from "./config/onboarding";
+import { createNewLocalAssistantFile } from "./config/workspace/newAssistant";
 import { createNewWorkspaceBlockFile } from "./config/workspace/workspaceBlocks";
 import { MCPManagerSingleton } from "./context/mcp/MCPManagerSingleton";
 import { streamDiffLines } from "./edit/streamDiffLines";
@@ -356,6 +357,11 @@ export class Core {
     on("config/addLocalWorkspaceBlock", async (msg) => {
       await createNewWorkspaceBlockFile(this.ide, msg.data.blockType);
       await this.configHandler.reloadConfig();
+    });
+
+    on("config/newLocalAssistant", async () => {
+      await createNewLocalAssistantFile(this.ide);
+      await this.configHandler.refreshAll();
     });
 
     on("config/openProfile", async (msg) => {

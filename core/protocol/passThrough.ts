@@ -20,6 +20,7 @@ export const WEBVIEW_TO_CORE_PASS_THROUGH: (keyof ToCoreFromWebviewProtocol)[] =
     "config/newPromptFile",
     "config/ideSettingsUpdate",
     "config/addLocalWorkspaceBlock",
+    "config/newLocalAssistant",
     "config/getSerializedProfileInfo",
     "config/deleteModel",
     "config/refreshProfiles",

@@ -71,11 +71,7 @@ export class ApplyManager {
     }
   }
 
-  // Used to only open a file it had just created, leaving an existing one to
-  // land wherever was focused - and used the path raw, which a code block's
-  // info string gives partial ("report/format.py" for the real, longer path),
-  // so it wrote an empty file at the made-up path. Resolves tolerantly now,
-  // like every other tool.
+  // Used to only open a file it had just created, leaving an existing one to land wherever was focused
   private async ensureFileOpen(filepath: string): Promise<void> {
     const resolved = await resolveWorkspacePath(filepath, this.ide);
     if (resolved) {
@@ -83,8 +79,7 @@ export class ApplyManager {
       return;
     }
 
-    // Genuinely not in the workspace yet - create it, but under the folder it
-    // names rather than wherever a bare relative path happens to point.
+    // Genuinely not in the workspace yet create it
     const newFileUri = await inferResolvedUriFromRelativePath(
       filepath,
       this.ide,

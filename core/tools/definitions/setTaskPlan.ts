@@ -2,11 +2,7 @@ import { Tool } from "../..";
 
 import { BUILT_IN_GROUP_NAME, BuiltInToolNames } from "../builtIn";
 
-// The model's own plan, declared up front - what its turn is tracked against.
-// Before this, "what does the task consist of?" came from regexing file paths
-// out of the request, which is nothing for "fix the failing tests". This
-// gives the harness a structure for any request, without scripting the model -
-// it still decides what to do next; the plan is just what's recited against.
+// The model's own plan, declared up front
 export const setTaskPlanTool: Tool = {
   type: "function",
   displayTitle: "Plan Task",

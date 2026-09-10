@@ -7,9 +7,7 @@ async function* toAsyncIterable(
   }
 }
 
-// Time between chunks, not the whole request - a slow model loading into VRAM
-// can take minutes for its first token. This only trips on total silence
-// after that, a strong sign the server actually died rather than being slow.
+// Time between chunks, not the whole request
 const STREAM_STALL_TIMEOUT_MS = 3 * 60 * 1000;
 
 export class StreamStallError extends Error {

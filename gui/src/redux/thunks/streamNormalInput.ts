@@ -5,13 +5,13 @@ import { ToCoreProtocol } from "core/protocol";
 import { selectActiveTools } from "../selectors/selectActiveTools";
 import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
-import { isAutoApprovedTool } from "../slices/uiSlice";
 import {
   abortStream,
   addPromptCompletionPair,
   setToolGenerated,
   streamUpdate,
 } from "../slices/sessionSlice";
+import { isAutoApprovedTool } from "../slices/uiSlice";
 import { ThunkApiType } from "../store";
 import { callCurrentTool } from "./callCurrentTool";
 
@@ -47,9 +47,6 @@ export const streamNormalInput = createAsyncThunk<
         tools: activeTools,
       };
 
-      // Small local models emit a well-formed tool call far more reliably when
-      // sampling is nearly greedy. Measured on qwen2.5-coder 7B through Ollama:
-      // 12/12 tool calls at temperature 0-0.2 versus 4/6 at 0.5.
       if (selectedChatModel.completionOptions?.temperature === undefined) {
         completionOptions.temperature = AGENT_MODE_TEMPERATURE;
       }

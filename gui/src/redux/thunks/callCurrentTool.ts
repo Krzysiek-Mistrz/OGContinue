@@ -1,29 +1,23 @@
 import { createAsyncThunk, unwrapResult } from "@reduxjs/toolkit";
 import { ContextItem } from "core";
 import { BuiltInToolNames, CLIENT_TOOLS } from "core/tools/builtIn";
-import { reasonTaskIncomplete } from "../../util/taskStateRecitation";
 import { callClientTool } from "../../util/clientTools/callClientTool";
+import { reasonTaskIncomplete } from "../../util/taskStateRecitation";
 import { selectCurrentToolCall } from "../selectors/selectCurrentToolCall";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   acceptToolCall,
-  setAgentPlanSteps,
   errorToolCall,
+  setAgentPlanSteps,
   setToolCallCalling,
   updateToolCallOutput,
 } from "../slices/sessionSlice";
 import { ThunkApiType } from "../store";
 import { streamResponseAfterToolCall } from "./streamResponseAfterToolCall";
 
-// A small model gets stuck reissuing the same call verbatim - refuse it after
-// twice and nudge to look again (it usually already made the change) rather
-// than stopping outright. Only ABSOLUTE_MAX_TOOL_CALLS_PER_TURN ends the turn.
+
 const IDENTICAL_CALL_LIMIT = 2;
 const IDENTICAL_CALL_STRONG_NUDGE_LIMIT = 4;
-
-// Backstop for the identical-call guard above, which only catches
-// byte-identical repeats - a model that varies whitespace/wording each time
-// drifts past it. This many calls without an answer is very likely a loop.
 const MAX_TOOL_CALLS_PER_TURN = 15;
 const ABSOLUTE_MAX_TOOL_CALLS_PER_TURN = 30;
 
@@ -89,9 +83,6 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
       state.session.history,
     );
 
-    // blocking a read is a deadlock, not a guard - it's idempotent, so a
-    // repeat just runs again with a loud note attached; only mutating tools
-    // get blocked outright
     const isReadonly =
       state.config.config.tools.find(
         (tool) => tool.function.name === toolName,
@@ -145,8 +136,6 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
       }
     }
 
-    // Copilot-style stop hook: check the completion claim before accepting it.
-    // The reason comes back as an ordinary tool result, where the model's already looking.
     if (toolName === BuiltInToolNames.TaskComplete) {
       const reason = reasonTaskIncomplete(
         state.session.history,
@@ -187,11 +176,6 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
     let errorMessage: string | undefined = undefined;
     let streamResponse: boolean;
 
-    // IMPORTANT:
-    // Errors that occur while calling tool call implementations
-    // Are caught and passed in output as context items
-    // Errors that occur outside specifically calling the tool
-    // Should not be caught here - should be handled as normal stream errors
     if (
       CLIENT_TOOLS.find(
         (clientToolName) => clientToolName === toolName,
@@ -244,10 +228,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
         }),
       );
     } else if (output?.length) {
-      // The result alone doesn't tell the model it has seen this before - each
-      // turn it mostly attends to the newest tool result, not to the pattern
-      // of what it already tried. Saying so explicitly, next to the answer, is
-      // what turns a repeat into a signal instead of just more of the same.
+      // The result alone doesn't tell the model it has seen this before
       const repeatNotice: ContextItem[] =
         identicalCalls > 0
           ? [
@@ -268,9 +249,7 @@ export const callCurrentTool = createAsyncThunk<void, undefined, ThunkApiType>(
       );
     }
 
-    // The terminal state: mark it done and let the turn end. Streaming a
-    // further response here would start the loop over, which is the one thing
-    // an explicit completion signal exists to prevent.
+    // The terminal state: mark it done and let the turn end
     if (toolName === BuiltInToolNames.TaskComplete && !errorMessage) {
       dispatch(acceptToolCall({ toolCallId }));
     }

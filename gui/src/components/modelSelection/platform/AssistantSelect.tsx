@@ -168,9 +168,7 @@ export default function AssistantSelect() {
       buttonRef.current.click();
     }
   }
-  // Upstream opened hub.continue.dev to create a synced assistant there -
-  // dead here, no hosted backend. Creates a new local ~/.continue/assistants/
-  // file instead, which shows up as its own switchable profile.
+  // Upstream opened hub.continue.dev to create a synced assistant here now we create a new switchable conf
   function onNewAssistant() {
     ideMessenger.post("config/newLocalAssistant", undefined);
     close();

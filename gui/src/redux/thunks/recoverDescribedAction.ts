@@ -11,12 +11,8 @@ import { isAutoApprovedTool } from "../slices/uiSlice";
 import { AppThunkDispatch, RootState } from "../store";
 import { callCurrentTool } from "./callCurrentTool";
 
-// A described-but-not-made call already has everything it needs - just the
-// formatting is missing - so this reconstructs and runs it instead of asking
-// the model to redo it. Goes through streamUpdate like a real streamed call,
-// so permissions, the repeated-call guard, and the diff UI all still apply.
 
-/** Runs the tool call the model described but never made; false if nothing concrete to act on. */
+// Runs the tool call the model described but never made
 export async function recoverDescribedAction({
   dispatch,
   getState,
@@ -54,7 +50,7 @@ export async function recoverDescribedAction({
   return runSynthesizedCall(dispatch, getState, action);
 }
 
-/** Injects a reconstructed call the same way a streamed one arrives. */
+// Injects a reconstructed call the same way a streamed one arrives
 async function runSynthesizedCall(
   dispatch: AppThunkDispatch,
   getState: () => RootState,
@@ -90,7 +86,7 @@ async function runSynthesizedCall(
   return true;
 }
 
-/** Applies a printed code block as a real edit, whether or not the turn stalled. */
+// Applies a printed code block as a real edit, whether or not the turn stalled.
 export async function applyUnappliedCodeBlock({
   dispatch,
   getState,

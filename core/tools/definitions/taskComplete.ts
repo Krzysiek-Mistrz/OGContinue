@@ -2,10 +2,7 @@ import { Tool } from "../..";
 
 import { BUILT_IN_GROUP_NAME, BuiltInToolNames } from "../builtIn";
 
-// Explicit terminal state for an agent turn. Without one, "finished?" can only
-// be guessed - from another tool call happening, or prose sounding done - and
-// a finished turn looks the same as a stalled one. Copilot's harness ends its
-// autonomous mode on exactly this signal.
+// Explicit terminal state for an agent turn. Without one, "finished?" can only be guessed
 export const taskCompleteTool: Tool = {
   type: "function",
   displayTitle: "Task Complete",

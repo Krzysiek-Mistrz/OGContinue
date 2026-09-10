@@ -1,16 +1,15 @@
 import { unwrapResult } from "@reduxjs/toolkit";
 import {
   ChatHistoryItem,
-  ChatMessage,
   RuleWithSource,
-  ToolStatus,
+  ToolStatus
 } from "core";
 import { constructMessages } from "core/llm/constructMessages";
 import { BuiltInToolNames } from "core/tools/builtIn";
 import { renderChatMessage } from "core/util/messageContent";
 import { getBaseSystemMessage } from "../../util";
-import { extractFilePathMentions } from "../../util/extractFilePathMentions";
 import { buildNudgeMessage, resolvedPathFor } from "../../util/agentNudge";
+import { extractFilePathMentions } from "../../util/extractFilePathMentions";
 import {
   collectTaskProgress,
   withTaskStateRecitation,
@@ -24,13 +23,7 @@ import {
 } from "./recoverDescribedAction";
 import { streamNormalInput } from "./streamNormalInput";
 
-// A small model often describes its next step and stops instead of taking
-// it, even with DEFAULT_AGENT_SYSTEM_MESSAGE telling it not to - a genuine
-// instruction-following ceiling no nudge wording fully closes. So "what's
-// left" comes from session.agentPlanTargets (ground truth from the user's
-// own request, see streamResponse.ts), checked against what tool calls
-// actually did - not the model's own account of its progress. With no plan
-// (single-file task, fresh message), falls back to narration + phrasing.
+
 const ANNOUNCES_NEXT_STEP =
   /\b(let'?s|let us|i'?ll|i will|next[,:]?\s|now[,:]?\s+(?:i|we|let)|we (?:need to|should|can|will)|first[,:]?\s|start by)\b/i;
 
@@ -52,7 +45,7 @@ const MUTATING_TOOLS: string[] = [
 // errored/canceled left the file unchanged - target's still outstanding
 const SUCCEEDED: ToolStatus[] = ["calling", "done"];
 
-/** Plan targets no successful file-changing tool call has covered yet. */
+// Plan targets no successful file-changing tool call has covered yet.
 function remainingPlanTargets(
   planTargets: string[],
   history: ChatHistoryItem[],
@@ -73,7 +66,7 @@ function remainingPlanTargets(
   return planTargets.filter((target) => !editedArgsText.includes(target));
 }
 
-/** Re-streams with a targeted nudge, up to MAX_NUDGE_ATTEMPTS; posts a visible notice if all fail. */
+// Re-streams with a targeted nudge, up to MAX_NUDGE_ATTEMPTS; posts a visible notice if all fail.
 export async function nudgeStalledAgent({
   dispatch,
   getState,
@@ -123,9 +116,7 @@ export async function nudgeStalledAgent({
       history,
     );
 
-    // every target changed = strongest evidence the task's done, stronger than
-    // anything the model says. But an unverified outcome check still counts
-    // as unfinished work.
+    // every target changed = strongest evidence the task's done, stronger than anything the model says
     const unverified = collectTaskProgress(
       history,
       state.session.agentPlanTargets,
@@ -145,8 +136,6 @@ export async function nudgeStalledAgent({
       return;
     }
 
-    // deliberately not a standalone trigger - every target's unfinished at the
-    // start of a task, so this only sharpens a nudge already justified
     const shouldNudge =
       afterToolCall ||
       ANNOUNCES_NEXT_STEP.test(stalledResponse) ||
@@ -156,7 +145,6 @@ export async function nudgeStalledAgent({
       return;
     }
 
-    // prefer doing the thing over asking for it
     if (await recoverDescribedAction({ dispatch, getState, pending })) {
       return;
     }

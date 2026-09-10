@@ -1,15 +1,9 @@
 import { ChatHistoryItem, ChatMessage } from "core";
 
-// Free of Redux so agent-eval's runner sends the model the exact same nudge
-// the extension does. Deliberately not "do not reply with text" - the failure
-// is describing a step instead of taking it, not describing it at all;
-// banning prose strips the commentary that makes agent mode readable.
+
 const GENERIC_NUDGE =
   "You described that step but did not take it. Carry it out now: say in one short sentence what you are doing and make the tool call in the same reply.";
 
-// Plan wording is routinely a partial path ("stats.py" for "lib/stats.py") -
-// quoting it back as if real just re-feeds the path reads keep failing on. A
-// target is only quoted once a successful call proved the full path.
 export function buildNudgeMessage(
   target: string | undefined,
   resolvedPath: string | undefined,
@@ -26,7 +20,6 @@ export function buildNudgeMessage(
   return { role: "user", content };
 }
 
-/** The real path a successful call proved this target resolves to; failed calls are skipped on purpose. */
 export function resolvedPathFor(
   target: string,
   history: ChatHistoryItem[],

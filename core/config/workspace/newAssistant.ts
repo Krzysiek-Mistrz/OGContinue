@@ -4,13 +4,8 @@ import { getGlobalAssistantsPath } from "../../util/paths";
 import { localPathToUri } from "../../util/pathToUri";
 import { joinPathsToUri } from "../../util/uri";
 
-/**
- * Any YAML file under ~/.continue/assistants/ (or <workspace>/.continue/assistants/,
- * see getDotContinueSubDirs) already loads as its own switchable profile - see
- * ConfigHandler.getLocalProfiles. Nothing wrote to that folder from the UI
- * before, so this is the missing other half: give the file a name, drop it
- * there, open it.
- */
+
+// give the file a name, drop it in ~/.continue/assistants/, open it
 export async function createNewLocalAssistantFile(ide: IDE): Promise<void> {
   const baseDirUri = localPathToUri(getGlobalAssistantsPath());
 

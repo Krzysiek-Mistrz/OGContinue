@@ -2,15 +2,15 @@ import { createAsyncThunk, unwrapResult } from "@reduxjs/toolkit";
 import { JSONContent } from "@tiptap/core";
 import { InputModifiers } from "core";
 import { constructMessages } from "core/llm/constructMessages";
+import { renderChatMessage } from "core/util/messageContent";
 import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
 import { getBaseSystemMessage } from "../../util";
-import { withTaskStateRecitation } from "../../util/taskStateRecitation";
 import {
   extractTaskTargets,
   extractVerifyTargets,
 } from "../../util/extractFilePathMentions";
-import { renderChatMessage } from "core/util/messageContent";
+import { withTaskStateRecitation } from "../../util/taskStateRecitation";
 import { selectSelectedChatModel } from "../slices/configSlice";
 import {
   setAgentPlanTargets,
@@ -96,8 +96,7 @@ export const streamResponseThunk = createAsyncThunk<
         const updatedHistory = getState().session.history;
         const messageMode = getState().session.mode
 
-        // ground truth from the user's own request, not the model's narration -
-        // overwritten every new message, since that means a new/updated task
+        // ground truth from the user's own request, not the model's narration
         const requestText = renderChatMessage({ role: "user", content });
         dispatch(
           setAgentPlanTargets(

@@ -4,11 +4,8 @@ import { extractFilePathMentions } from "./extractFilePathMentions";
 
 // A small model loops mostly because it forgets what it already did - each
 // turn it attends to the newest tool result, not the pattern of past ones.
-// This restates progress at the end of every request (like Manus' todo.md),
+// This restates progress at the end of every request (like todo.md),
 // built from tool calls actually executed, never the model's own account.
-// Two rules learned the hard way: never name one file two ways (plan wording
-// vs. real path), and never tell the model to stop writing prose - only to
-// stop describing a step instead of taking it.
 
 const READ_TOOLS: string[] = [
   BuiltInToolNames.ReadFile,
@@ -20,7 +17,6 @@ const EDIT_TOOLS: string[] = [
   BuiltInToolNames.CreateNewFile,
 ];
 
-// Long enough to be worth reciting, short enough not to bury the tool result.
 const MAX_LISTED_PATHS = 8;
 
 function formatPaths(paths: string[]): string {
@@ -37,8 +33,6 @@ interface TaskProgress {
   unverified: string[];
 }
 
-// A failed command isn't progress or verification - its failure sits in the
-// result status, not as a tool error, so the call itself still looks ok.
 function commandSucceeded(state: {
   toolCall: { function: { name: string } };
   output?: { status?: string }[];
@@ -51,13 +45,11 @@ function commandSucceeded(state: {
   );
 }
 
-/** Tool calls that actually ran and produced a result. */
 function succeededCalls(history: ChatHistoryItem[]) {
   return history
     .map((item) => item.toolCallState)
     .filter(
       (state): state is NonNullable<typeof state> =>
-        // errored/blocked calls changed nothing - not progress
         !!state &&
         (state.status === "done" || state.status === "calling") &&
         commandSucceeded(state),
@@ -91,13 +83,11 @@ export function collectTaskProgress(
   }
 
   const editedPaths = Array.from(edited);
-  // report the real path a tool call proved, not the plan's wording
   const resolve = (target: string) =>
     [...editedPaths, ...read].find((path) => path.includes(target)) ?? target;
   const commandText = commandsRun.join(" ");
 
   return {
-    // edited beats read - don't report the same file as both
     read: Array.from(read).filter((path) => !edited.has(path)),
     edited: editedPaths,
     pending: planTargets
@@ -109,9 +99,6 @@ export function collectTaskProgress(
   };
 }
 
-// A plan step only counts as done once something's changed or run for it -
-// not read, since reading is how a step starts, not finishes. A step naming
-// no file is still recited but can never block completion.
 const PROGRESS_TOOLS: string[] = [
   BuiltInToolNames.EditExistingFile,
   BuiltInToolNames.CreateNewFile,
@@ -143,7 +130,6 @@ export function collectPlanProgress(
   });
 }
 
-/** Plan steps that name a file and have not been carried out. */
 function unfinishedCheckableSteps(
   steps: string[],
   history: ChatHistoryItem[],
@@ -153,7 +139,6 @@ function unfinishedCheckableSteps(
   );
 }
 
-/** Appended as the last message of an agent request; undefined if nothing to recite yet. */
 export function buildTaskStateRecitation(
   history: ChatHistoryItem[],
   planTargets: string[],
@@ -172,7 +157,6 @@ export function buildTaskStateRecitation(
 
   const lines = ["[Task state - maintained automatically, not written by you]"];
 
-  // the model's own plan, if it declared one, is what progress is recited against
   const steps = collectPlanProgress(planSteps, history);
   if (steps.length) {
     lines.push("Your plan:");
@@ -219,7 +203,6 @@ export function buildTaskStateRecitation(
   return { role: "user", content: lines.join("\n") };
 }
 
-/** No-op outside agent mode - nothing to recite. */
 export function withTaskStateRecitation(
   messages: ChatMessage[],
   mode: string,
@@ -240,14 +223,12 @@ export function withTaskStateRecitation(
   return recitation ? [...messages, recitation] : messages;
 }
 
-/** The gate behind task_complete: reason it's not finished, or undefined if it is. */
 export function reasonTaskIncomplete(
   history: ChatHistoryItem[],
   planTargets: string[],
   verifyTargets: string[],
   planSteps: string[] = [],
 ): string | undefined {
-  // the model's own plan outranks paths guessed from the request text
   const unfinished = unfinishedCheckableSteps(planSteps, history);
   if (unfinished.length) {
     const list = unfinished.map((step) => `"${step.text}"`).join(", ");

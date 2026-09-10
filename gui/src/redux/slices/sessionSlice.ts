@@ -51,17 +51,8 @@ type SessionState = {
     curIndex: number;
   };
   newestToolbarPreviewForInput: Record<string, string>;
-  // File paths the user's own request named, extracted up front when an
-  // Agent-mode message is submitted - not derived from the model's own
-  // narration, which is unreliable once a multi-step task is in progress
-  // (see nudgeStalledAgent.ts). Ground truth for what the task actually
-  // covers, used to keep nudging toward concrete unfinished targets instead
-  // of a generic "continue" once one target is done.
   agentPlanTargets: string[];
   agentVerifyTargets: string[];
-  // The model's own plan, declared through the set_task_plan tool. Takes over
-  // from the regex-derived targets above once it exists, since it covers
-  // requests that never name a file path at all.
   agentPlanSteps: string[];
 };
 
@@ -271,10 +262,7 @@ export const sessionSlice = createSlice({
 
       state.isStreaming = false;
     },
-    /**
-     * Replaces the full history with a single condensed recap once the
-     * conversation is close to filling the model's context window
-     */
+    //Replaces the full history with a single condensed recap once the conversation is close to filling the model's context window
     compactHistory: (state, { payload }: PayloadAction<{ summary: string }>) => {
       state.history = [
         {
@@ -304,12 +292,7 @@ export const sessionSlice = createSlice({
       // A new request means a new task, so the previous plan is gone.
       state.agentPlanSteps = [];
     },
-    /**
-     * Appends a distinct new history item rather than merging into the
-     * model's last message (unlike streamUpdate), so an automated notice -
-     * e.g. that nudging gave up - reads as clearly separate from the
-     * model's own words instead of looking like something it said itself.
-     */
+    // Appends a distinct new history item rather than merging into the model's last message
     appendAssistantNotice: (state, { payload }: PayloadAction<string>) => {
       state.history.push({
         message: {
@@ -481,9 +464,7 @@ export const sessionSlice = createSlice({
 
       state.isStreaming = false;
       state.symbols = {};
-      // Stale apply/diff state from the previous session's tool calls -
-      // keyed by toolCallIds that no longer exist once history is reset -
-      // otherwise carries over into the new chat.
+      // Stale apply/diff state from the previous session's tool calls
       state.codeBlockApplyStates = { states: [], curIndex: 0 };
       state.agentPlanTargets = [];
       state.agentVerifyTargets = [];

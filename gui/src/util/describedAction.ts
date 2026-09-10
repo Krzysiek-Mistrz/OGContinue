@@ -3,9 +3,6 @@ import { BuiltInToolNames } from "core/tools/builtIn";
 import { renderChatMessage } from "core/util/messageContent";
 import { extractFilePathMentions } from "./extractFilePathMentions";
 
-// Decides what call a response describes but doesn't make - free of Redux/IDE
-// deps so agent-eval's headless runner can exercise the real decision, not a
-// lookalike. Dispatching half lives in redux/thunks/recoverDescribedAction.ts.
 
 const CODE_FENCE = /```([^\n]*)\n([\s\S]*?)(?:```|$)/g;
 
@@ -14,7 +11,6 @@ const EDIT_TOOLS: string[] = [
   BuiltInToolNames.CreateNewFile,
 ];
 
-// span of one sentence - a path from earlier prose starts leaking in past this
 const PATH_LOOKBEHIND_CHARS = 300;
 
 const READ_INTENT =
@@ -25,7 +21,6 @@ export interface DescribedAction {
   args: Record<string, string>;
 }
 
-/** The call a response describes but doesn't make, or undefined. */
 export function describedAction(
   text: string,
   pending: string[],
@@ -33,7 +28,6 @@ export function describedAction(
   return describedEdit(text) ?? describedRead(text, pending);
 }
 
-/** Whether a successful edit already covers this path - work done, not owed. */
 function alreadyEdited(filepath: string, history: ChatHistoryItem[]): boolean {
   return history.some((item) => {
     const state = item.toolCallState;
@@ -47,10 +41,6 @@ function alreadyEdited(filepath: string, history: ChatHistoryItem[]): boolean {
     );
   });
 }
-
-// Scans the whole turn, not just a stalled one - the common case is the model
-// prints the fixed code and carries straight on, leaving it behind an Apply
-// button nobody clicks. Work was done; only the applying wasn't.
 
 export function unappliedCodeBlock(
   history: ChatHistoryItem[],
@@ -68,7 +58,6 @@ export function unappliedCodeBlock(
   return undefined;
 }
 
-/** A code block the model printed instead of calling the edit tool. */
 function describedEdit(text: string): DescribedAction | undefined {
   CODE_FENCE.lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -91,10 +80,6 @@ function describedEdit(text: string): DescribedAction | undefined {
   }
   return undefined;
 }
-
-// A read announced but not made. Naming a pending file is enough on its own
-// (reading is the safe next step either way); a file outside the plan needs
-// the read intent stated explicitly.
 
 function describedRead(
   text: string,

@@ -47,7 +47,6 @@ describe("collectTaskProgress", () => {
     const progress = collectTaskProgress(history, PLAN);
 
     expect(progress.edited).toEqual(["agent-test-app/src/formatters/text.py"]);
-    // The edited file is reported as edited, not also as read.
     expect(progress.read).toEqual(["agent-test-app/lib/math_utils/stats.py"]);
     expect(progress.pending).toEqual(["agent-test-app/lib/math_utils/stats.py"]);
   });
@@ -109,9 +108,6 @@ describe("naming a file consistently", () => {
     const content = buildTaskStateRecitation(history, ["math_utils/stats.py"])!
       .content as string;
 
-    // The bug this guards: saying "already read agent-test-app/lib/.../stats.py"
-    // and "still to change math_utils/stats.py" reads as two different files,
-    // so the model re-reads the one it was just told it already had.
     expect(content).toContain(
       "Still to change: agent-test-app/lib/math_utils/stats.py",
     );
@@ -175,8 +171,6 @@ describe("the task_complete gate", () => {
 
   test("rejects a completion claimed after only half the work", () => {
     const reason = reasonTaskIncomplete([editFormat], PLAN, VERIFY);
-    // No successful call has touched this one yet, so there is no proven path
-    // to quote - the request's own wording is all that can honestly be used.
     expect(reason).toContain("calc/stats.py");
     expect(reason).toContain("has not been edited");
   });

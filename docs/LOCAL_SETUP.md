@@ -20,14 +20,17 @@ request does not spell out, and a third file that has to run afterwards — and
 then checks the result behaviourally. A run counts only if all eight checks
 pass with no human help at any point.
 
-| Model | Size | Runs fixed completely | Steps | Native tool calls | Verdict |
-| ----- | ---- | --------------------- | ----- | ----------------- | ------- |
-| `gemma4-e4b-q4` | 7.5B | 3/3 | 6-7 | yes | **Recommended.** No nudges, no repeated reads, ends by handing back cleanly |
-| `qwen2.5-coder:7b-instruct-q4_K_M` | 7.6B | 5/5 | 5-6 | **no** | Just as reliable here, one step shorter on average. Every tool call arrives as plain text and is parsed back by the recovery layer |
-| `qwen2.5-coder:1.5b-base-q8_0` | 1.5B | n/a | - | n/a | Autocomplete only — a base model, not for chat or agent |
+| Model | Backend | Size | Runs fixed completely | Steps | Native tool calls | Verdict |
+| ----- | ------- | ---- | --------------------- | ----- | ----------------- | ------- |
+| `gemma4-e4b-q4` | Ollama | 7.5B | 3/3 | 6-7 | yes | **Recommended.** No nudges, no repeated reads, ends by handing back cleanly |
+| `qwen2.5-coder:7b-instruct-q4_K_M` | Ollama | 7.6B | 5/5 | 5-6 | **no** | Just as reliable here, one step shorter on average. Every tool call arrives as plain text and is parsed back by the recovery layer |
+| `qwen2.5-coder:1.5b-base-q8_0` | Ollama | 1.5B | n/a | - | n/a | Autocomplete only — a base model, not for chat or agent |
+| `Qwen3-4B-Instruct-2507-Q4_K_M` | llama.cpp | 4B | 1/5 | 11-30 | yes | Native tool calls work cleanly over llama.cpp, but the model itself loops - hits the repeat guard and burns steps re-running the same failed command instead of reading the error. Not recommended for Agent mode |
+| `Phi-4-mini-instruct-Q4_K_M` | llama.cpp | 3.8B | 0/5 | 5-6 | **no** | Never emits a native tool call even with `--jinja`, and narrates or prints Python-call-style pseudo-syntax (`builtin_task_complete(...)`) that this fork's JSON-shaped recovery layer isn't built to catch. Stalls out on nudges almost immediately. Not recommended |
 
-Every run of both models finished by calling the completion tool rather than
-by running out of steps or stalling.
+Every run of gemma4 and qwen2.5-coder:7b finished by calling the completion
+tool rather than by running out of steps or stalling; Qwen3-4B and Phi-4-mini
+did not manage that even once.
 
 The `qwen2.5-coder:7b` result is the surprising one: across every run it never
 once used the tool-calling API, printing each call as prose instead. Agent
@@ -36,15 +39,35 @@ reliability](#agent-mode-reliability-with-small-local-models) below). That
 makes it more sensitive to changes in the harness than gemma4 is, even though
 its score here is identical.
 
+Qwen3-4B and Phi-4-mini were tried specifically as smaller, VRAM-friendlier
+alternatives on the theory that a newer, purpose-tuned small model might do
+better than the two above - neither did. Qwen3-4B's native tool-calling
+worked fine mechanically (llama.cpp + `--jinja`, zero parsing issues), it's
+the model's own judgment that gets stuck. Phi-4-mini's failure is different
+and more fundamental: its plain-text tool-call style doesn't match the
+JSON-object shape `tryRecoverToolCallFromText` looks for, so unlike
+qwen2.5-coder:7b it gets no benefit from the recovery layer at all. Recovering
+Phi-4-mini's style would need a second, differently-shaped recovery path - not
+attempted here, since qwen2.5-coder:7b and gemma4-e4b-q4 already cover the
+6 GB tier reliably.
+
 The 14B and 32B rows in the VRAM table are extrapolations from the 7B result,
 not measurements — nothing that large has been run against the fixture here.
 
-To measure a model yourself:
+To measure a model yourself, against Ollama:
 
 ```bash
 cd manual-testing-sandbox/agent-eval
 ./build-probe.sh          # once, and after changing harness code
 ./run-eval.sh <your-ollama-model> 5
+```
+
+Or against a `llama-server` instance (start it first, see the llama.cpp
+config above):
+
+```bash
+EVAL_BACKEND=llamacpp LLAMACPP_HOST=http://127.0.0.1:8080 \
+  ./run-eval.sh <a-label-for-your-logs> 5
 ```
 
 ## Autocomplete

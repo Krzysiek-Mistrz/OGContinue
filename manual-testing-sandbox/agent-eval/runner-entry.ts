@@ -32,6 +32,8 @@ import {
 import { createFsIde } from "./runner-ide";
 
 const OLLAMA = process.env.OLLAMA_HOST ?? "http://localhost:11434";
+const LLAMACPP = process.env.LLAMACPP_HOST ?? "http://127.0.0.1:8080";
+const BACKEND = process.env.EVAL_BACKEND === "llamacpp" ? "llamacpp" : "ollama";
 const CONTEXT_LENGTH = Number(process.env.EVAL_NUM_CTX ?? 8192);
 const MAX_STEPS = Number(process.env.MAX_STEPS ?? 30);
 
@@ -45,7 +47,7 @@ interface Step {
   detail: string;
 }
 
-async function chat(model: string, messages: any[]) {
+async function chatOllama(model: string, messages: any[]) {
   const response = await fetch(`${OLLAMA}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -63,6 +65,65 @@ async function chat(model: string, messages: any[]) {
     );
   }
   return (await response.json()).message;
+}
+
+// llama-server's parser requires strict OpenAI shape: every tool_calls[i]
+// needs `type: "function"` and a stringified `arguments`, unlike Ollama's
+// looser native format that this harness's `messages` array otherwise uses.
+function toOpenAiShape(m: any) {
+  if (m.role === "assistant" && m.tool_calls?.length) {
+    return {
+      ...m,
+      tool_calls: m.tool_calls.map((tc: any) => ({
+        id: tc.id,
+        type: "function",
+        function: {
+          name: tc.function.name,
+          arguments: JSON.stringify(tc.function.arguments),
+        },
+      })),
+    };
+  }
+  return m;
+}
+
+// llama-server serves exactly one loaded GGUF, so `model` is a label only -
+// same as the real LlamaCpp provider, which never sends a `model` field.
+async function chatLlamaCpp(model: string, messages: any[]) {
+  const response = await fetch(`${LLAMACPP}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messages: messages.map(toOpenAiShape),
+      tools: allTools.map((t) => ({ type: "function", function: t.function })),
+      stream: false,
+      temperature: 0.2,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `llama.cpp ${response.status} for ${model}: ${await response.text()}`,
+    );
+  }
+  const message = (await response.json()).choices[0].message;
+  // OpenAI-shaped tool_calls carry stringified arguments; the rest of this
+  // loop expects the already-parsed object, matching Ollama's native shape.
+  if (message.tool_calls?.length) {
+    message.tool_calls = message.tool_calls.map((tc: any) => ({
+      ...tc,
+      function: {
+        ...tc.function,
+        arguments: JSON.parse(tc.function.arguments),
+      },
+    }));
+  }
+  return message;
+}
+
+async function chat(model: string, messages: any[]) {
+  return BACKEND === "llamacpp"
+    ? chatLlamaCpp(model, messages)
+    : chatOllama(model, messages);
 }
 
 function historyItem(
@@ -197,10 +258,11 @@ async function main() {
     nudge = [];
     nudgeAttempts = 0;
 
+    const toolCallId = `call_${step}`;
     messages.push({
       role: "assistant",
       content: how === "recovered" ? "" : text,
-      tool_calls: [{ function: { name, arguments: args } }],
+      tool_calls: [{ id: toolCallId, function: { name, arguments: args } }],
     });
 
     if (name === BuiltInToolNames.SetTaskPlan && Array.isArray(args?.steps)) {
@@ -230,7 +292,7 @@ async function main() {
             }
           }
         }
-        messages.push({ role: "tool", tool_name: name, content: reason });
+        messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content: reason });
         history.push(historyItem(name, args, "errored"));
         steps.push({ tool: name, args, how, ok: false, detail: "rejected" });
         continue;
@@ -247,7 +309,7 @@ async function main() {
     if (!tool.readonly && identical >= 2) {
       const blocked = `${name} has already been called with exactly these arguments ${identical} times, so calling it again cannot produce a different result. Do something else.`;
       console.log(`${step + 1}. BLOCKED ${name} (repeat guard)`);
-      messages.push({ role: "tool", tool_name: name, content: blocked });
+      messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content: blocked });
       steps.push({ tool: name, args, how, ok: false, detail: "blocked" });
       continue;
     }
@@ -272,7 +334,7 @@ async function main() {
     }
 
     history.push(historyItem(name, args, ok ? "done" : "errored", toolOutput));
-    messages.push({ role: "tool", tool_name: name, content });
+    messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content });
     const label = args?.filepath ?? args?.command ?? args?.pattern ?? args?.dirPath ?? "";
     console.log(`${step + 1}. ${ok ? "ok  " : "FAIL"} ${name} ${label} (${how})`);
     if (!ok) {

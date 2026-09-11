@@ -20,7 +20,7 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: root-cache
         with:
           path: node_modules
@@ -40,12 +40,12 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -67,12 +67,12 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -96,13 +96,13 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: root-cache
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: core-cache
         with:
           path: core/node_modules
@@ -124,19 +124,19 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: root-cache
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: core-cache
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -165,23 +165,23 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: gui-cache
         with:
           path: gui/node_modules
           key: ${{ runner.os }}-gui-node-modules-${{ hashFiles('gui/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -208,23 +208,23 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: gui-cache
         with:
           path: gui/node_modules
           key: ${{ runner.os }}-gui-node-modules-${{ hashFiles('gui/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -250,23 +250,23 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: vscode-cache
         with:
           path: extensions/vscode/node_modules
           key: ${{ runner.os }}-vscode-node-modules-${{ hashFiles('extensions/vscode/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -295,23 +295,23 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: node_modules
           key: ${{ runner.os }}-root-node-modules-${{ hashFiles('package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: vscode-cache
         with:
           path: extensions/vscode/node_modules
           key: ${{ runner.os }}-vscode-node-modules-${{ hashFiles('extensions/vscode/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -339,12 +339,12 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules
@@ -384,7 +384,7 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-config-yaml-node-modules-${{ hashFiles('packages/config-yaml/package-lock.json') }}
@@ -409,18 +409,18 @@ jobs:
         with:
           node-version-file: ".nvmrc"
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: gui-cache
         with:
           path: gui/node_modules
           key: ${{ runner.os }}-gui-node-modules-${{ hashFiles('gui/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: core/node_modules
           key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: config-yaml-cache
         with:
           path: packages/config-yaml/node_modules

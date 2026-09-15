@@ -30,13 +30,8 @@ interface LlamaCppChatResponse {
   }>;
 }
 
-// A misconfigured or template-less llama-server (missing --chat-template /
-// --jinja, or a GGUF whose embedded template isn't picked up) can fail to
-// stop generation at a turn boundary, letting literal turn markers like
-// Gemma's <end_of_turn> leak into the text as content instead of ending the
-// response - the model then narrates several "turns" back to back in one
-// completion. Sending these as stop sequences catches that server-side even
-// when the template itself doesn't.
+// backstop for a misconfigured server (no --jinja/chat-template) that doesn't stop
+// at turn boundaries - w/o this the model just rambles thru several "turns" in one go
 const DEFAULT_TURN_STOP_SEQUENCES = [
   "<end_of_turn>",
   "<start_of_turn>",
@@ -243,9 +238,7 @@ class LlamaCpp extends BaseLLM {
         }));
       }
 
-      // Small models often print the call as plain JSON text, or as
-      // Python-call syntax (builtin_tool("arg")), instead of triggering
-      // llama.cpp's own template-based tool-call parsing.
+      // small models often print the call as raw json or python-call syntax instead of a real tool call
       if (!chatMessage.toolCalls?.length && validToolNames.length) {
         const text = renderChatMessage(chatMessage);
         const recovered =

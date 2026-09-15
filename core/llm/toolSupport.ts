@@ -122,8 +122,7 @@ export const PROVIDER_TOOL_SUPPORT: Record<
     return true;
   },
   "llama.cpp": (model) => {
-    // llama-server serves whatever GGUF the user pointed it at - no registry
-    // to check against, so same policy as Ollama: trust the user, don't gate.
+    // no registry to check GGUFs against - same as ollama, trust the user
     return true;
   },
   sambanova: (model) => {

@@ -16,15 +16,7 @@ import { BuiltInToolNames } from "../../tools/builtIn.js";
 import { BaseLLM } from "../index.js";
 import { streamResponse } from "../stream.js";
 
-/**
- * Small models frequently produce a tool-call-shaped object that isn't
- * strictly valid JSON: multi-line code embedded with raw, unescaped
- * newlines, or Python-style triple-quoted strings (`"""..."""`) instead of a
- * properly escaped JSON string. This walks the candidate text and rewrites
- * every double-quoted (or triple-double-quoted) string span into a
- * correctly escaped JSON string, so the result can be parsed by
- * `JSON.parse`. Braces/structure outside of string spans are left untouched.
- */
+// fixes up pseudo-JSON w/ raw newlines or python triple-quotes so JSON.parse works
 function repairPseudoJsonCandidate(candidate: string): string {
   let out = "";
   let i = 0;
@@ -102,26 +94,13 @@ function repairPseudoJsonCandidate(candidate: string): string {
   return out;
 }
 
-/**
- * Finds where text should stop being streamed to the user because it may be
- * the beginning of a tool call printed as plain JSON. Returns the index of
- * that point, including an opening code fence when the object is wrapped in
- * one, or -1 when nothing needs to be held back.
- *
- * Also holds back a bare tool name typed just before its arguments arrive
- * (some models print `<tool_name> {args}` instead of wrapping the call in
- * `{"name": ..., "arguments": ...}`) so `<tool_name> ` isn't streamed out as
- * ordinary text before `tryRecoverToolCallFromText` gets a chance to match
- * it against the JSON object that follows.
- */
+// where to stop streaming - a tool call may be starting (json, fence, or bare tool name)
 function findToolCallTextStart(
   text: string,
   validToolNames: string[] = [],
 ): number {
   const braceIndex = text.indexOf("{");
-  // A fence arriving before the opening brace must be held back too,
-  // otherwise it is streamed out and left orphaned once the tool call it
-  // wraps is lifted out of the text.
+  // hold back a fence before the brace too, else it gets orphaned once we lift the call out
   const searchArea = braceIndex === -1 ? text : text.slice(0, braceIndex);
   const fenceMatch = searchArea.match(/```[a-zA-Z]*\s*$/);
 
@@ -140,27 +119,15 @@ function findToolCallTextStart(
   return -1;
 }
 
-/**
- * Removes code fences left empty after a tool call was lifted out of them.
- */
+// cleans up empty fences left after a tool call got lifted out
 function stripEmptyCodeFences(text: string): string {
   return text.replace(/```[a-zA-Z]*\s*```/g, "").trim();
 }
 
-/**
- * Small/quantized models sometimes fail to trigger Ollama's native tool-call
- * parsing (which depends on the model's own chat template recognizing a
- * specific token sequence) and instead just print a tool-call-shaped JSON
- * object as ordinary text. This scans a message's text content for a
- * balanced `{ ... }` object whose "name" matches one of the tools we
- * actually offered, so we can still recover and execute the call instead of
- * silently showing raw JSON in the chat. An object left unclosed because the
- * response was cut short is closed first, as long as the cut did not land
- * inside a string value.
- *
- * Returns the recovered call plus the surrounding text with the JSON
- * stripped out, or null if nothing matching was found.
- */
+// small models often print the call as raw json text instead of a real tool call
+// this scans for a balanced {...} matching a known tool name and recovers it
+// cut-off objects get closed first, but only if the cut wasn't mid-string
+// returns the call + leftover text w/ the json stripped, or null
 export function tryRecoverToolCallFromText(
   content: string,
   validToolNames: string[],
@@ -299,9 +266,7 @@ function parsePythonLiteral(token: string): unknown {
   return t;
 }
 
-// Scans a call's argument list starting right after its opening "(",
-// splitting on top-level commas while respecting quotes (including Python
-// triple-quotes) and nested brackets, until the matching ")" is found.
+// splits args after "(" on top-level commas, respects quotes/triple-quotes/nested brackets
 function scanPythonCallArgs(
   text: string,
   start: number,
@@ -373,13 +338,8 @@ function scanPythonCallArgs(
   return null;
 }
 
-// Some models don't just print a real tool under a shortened name - they
-// invent an entirely different, plausible-sounding one (seen: "write_file",
-// "save_file" for what is really an edit of an existing file). These are
-// common enough conventions from other tools' training data that mapping
-// them onto the closest real builtin is worth it; ambiguous verbs default to
-// editing rather than creating, since agent tasks overwhelmingly edit files
-// that already exist.
+// some models invent their own tool name (write_file, save_file...) instead of a shortened
+// real one - map common verbs to the closest builtin, default to edit over create
 const HALLUCINATED_TOOL_NAME_ALIASES: Record<string, BuiltInToolNames> = {
   write_file: BuiltInToolNames.EditExistingFile,
   writefile: BuiltInToolNames.EditExistingFile,
@@ -394,11 +354,7 @@ function normalizeParamKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z]/g, "");
 }
 
-// The two concepts every file tool's arguments boil down to - which file,
-// and what to put in it - collapsed into equivalence classes so a
-// hallucinated keyword like "file_path" or "content" still lands on
-// whichever real parameter name ("filepath", "changes", "contents", ...)
-// the matched tool actually declares.
+// maps hallucinated keys (file_path, content...) to whatever the real param is called
 const PARAM_KEY_CLASSES = [
   ["filepath", "filepathname", "path", "filename", "file"],
   [
@@ -429,28 +385,13 @@ function resolveParamKey(
   return realParamNames.find((p) => matchingClass.has(normalizeParamKey(p)));
 }
 
-// A keyword argument, e.g. `file_path='a.py'` - the `=` must sit outside any
-// quoted value, so this only ever runs against a single already-split
-// top-level argument from scanPythonCallArgs, never the raw call text.
+// matches a keyword arg like file_path='a.py' - only run on 1 already-split arg, never raw text
 const KEYWORD_ARG_PATTERN = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([\s\S]*)$/;
 
-/**
- * Some models (seen on both llama.cpp and Ollama) narrate a tool call as
- * Python-style call syntax - `builtin_edit_existing_file("path", "code")` -
- * instead of the {"name": ..., "arguments": ...} object the JSON recovery
- * above looks for. This maps the positional arguments back onto the tool's
- * declared parameter order so the call can still be recovered and run.
- *
- * Gemma's code-execution convention goes a step further: it drops the
- * "builtin_" prefix and namespaces the call under "tool_code.", e.g.
- * `tool_code.read_file("path")` instead of `builtin_read_file("path")` -
- * so both the short alias and an optional identifier-dot namespace prefix
- * are matched and mapped back onto the real tool name. It also sometimes
- * invents its own tool name and calls it with keyword arguments instead of
- * positional ones, e.g. `file_manager.write_file(file_path='a.py',
- * content='...')` - both HALLUCINATED_TOOL_NAME_ALIASES and
- * resolveParamKey exist to still recover that call correctly.
- */
+// some models narrate a call as python syntax - builtin_edit_existing_file("path", "code") -
+// maps positional args back to the tool's param order
+// also handles gemma's tool_code.<name>() prefix-dropped/namespaced style, and
+// invented tool names w/ keyword args (file_manager.write_file(file_path='a.py', ...))
 export function tryRecoverPythonCallFromText(
   content: string,
   tools: Tool[],

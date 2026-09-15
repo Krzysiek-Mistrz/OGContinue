@@ -8,8 +8,7 @@ type EditToolCallProps = {
   historyIndex: number;
 };
 
-// editToolImpl applies this directly, with nothing left to stream - no
-// apply-state/streamId machinery needed here, same as CreateFile.
+// editToolImpl applies directly now, no apply-state/streamId needed, same as CreateFile
 export function EditFile(props: EditToolCallProps) {
   const src = `\`\`\`${getMarkdownLanguageTagForFile(props.relativeFilePath ?? "test.txt")} ${props.relativeFilePath}\n${props.changes ?? ""}\n\`\`\``;
 

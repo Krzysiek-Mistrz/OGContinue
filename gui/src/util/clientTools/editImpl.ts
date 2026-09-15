@@ -2,16 +2,11 @@ import { resolveWorkspacePath } from "core/util/ideUtils";
 import { getUriPathBasename } from "core/util/uri";
 import { ClientToolImpl } from "./callClientTool";
 
-// A partial diff instead of complete file content - the tool's own
-// description forbids this, but a model sends one anyway sometimes.
+// catches "... existing code ..." placeholders - model sends these sometimes even tho it shouldn't
 const LAZY_MARKER = /\.{3}\s*(.+?)\s*\.{3}/;
 
-// Applied directly, the same way the agent-eval harness does it. The
-// interactive accept/reject diff flow (ApplyManager/VerticalDiffManager)
-// depends on a streamId nothing ever seeds and a "closed" push that doesn't
-// reliably arrive back - in practice the turn stalls spinning forever right
-// after Accept. The tool's own contract already requires complete file
-// content, so a diff review has nothing to add on top of that.
+// applies directly like the eval harness does - ApplyManager's diff flow relies on a
+// streamId that never reliably gets seeded/closed, so it just stalls after Accept
 export const editToolImpl: ClientToolImpl = async (
   args,
   toolCallId,

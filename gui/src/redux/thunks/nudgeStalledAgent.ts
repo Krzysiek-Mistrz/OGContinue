@@ -145,7 +145,14 @@ export async function nudgeStalledAgent({
       return;
     }
 
-    if (await recoverDescribedAction({ dispatch, getState, pending })) {
+    if (
+      await recoverDescribedAction({
+        dispatch,
+        getState,
+        pending,
+        verifyTargets: unverified,
+      })
+    ) {
       return;
     }
 

@@ -17,10 +17,12 @@ export async function recoverDescribedAction({
   dispatch,
   getState,
   pending,
+  verifyTargets = [],
 }: {
   dispatch: AppThunkDispatch;
   getState: () => RootState;
   pending: string[];
+  verifyTargets?: string[];
 }): Promise<boolean> {
   const state = getState();
   const history = state.session.history;
@@ -29,18 +31,19 @@ export async function recoverDescribedAction({
     return false;
   }
 
-  const action = describedAction(text, pending);
+  const action = describedAction(text, pending, verifyTargets);
   if (!action) {
     return false;
   }
 
-  // already made? its result is already in context - don't loop rebuilding it
+  // already made? don't loop rebuilding it - compare full args, not just filepath
+  // (a run cmd's identity is `command`, filepath-only would treat any 2 as the same)
   const alreadyCalled = history.some((item) => {
     const previous = item.toolCallState;
     return (
       !!previous &&
       previous.toolCall.function.name === action.toolName &&
-      previous.parsedArgs?.filepath === action.args.filepath
+      JSON.stringify(previous.parsedArgs ?? {}) === JSON.stringify(action.args)
     );
   });
   if (alreadyCalled) {

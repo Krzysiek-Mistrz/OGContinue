@@ -16,6 +16,19 @@ const PATH_LOOKBEHIND_CHARS = 300;
 const READ_INTENT =
   /\b(read|reading|open|look at|inspect|check|view|examine|contents of)\b/i;
 
+const RUN_INTENT =
+  /\b(run|running|execute|executing|verify|verifying|test|testing)\b/i;
+
+// conservative on purpose - wrong guess here runs an arbitrary shell cmd, so only
+// unambiguous extensions covered, else it falls thru and gets nudged again
+const INTERPRETER_BY_EXTENSION: Record<string, string> = {
+  py: "python",
+  js: "node",
+  mjs: "node",
+  cjs: "node",
+  sh: "bash",
+};
+
 export interface DescribedAction {
   toolName: string;
   args: Record<string, string>;
@@ -24,8 +37,16 @@ export interface DescribedAction {
 export function describedAction(
   text: string,
   pending: string[],
+  verifyTargets: string[] = [],
 ): DescribedAction | undefined {
-  return describedEdit(text) ?? describedRead(text, pending);
+  return (
+    describedEdit(text) ??
+    describedReadPending(text, pending) ?? // reliable case: path is still a pending edit target
+    // try run before the loose read fallback below - else "check it works" gets
+    // misread as re-reading an already-read file (READ_INTENT matches "check" too)
+    describedRun(text, verifyTargets) ??
+    describedReadFallback(text)
+  );
 }
 
 function alreadyEdited(filepath: string, history: ChatHistoryItem[]): boolean {
@@ -58,12 +79,16 @@ export function unappliedCodeBlock(
   return undefined;
 }
 
+// bare "}" etc (cut-off json scrap) isn't real content - reconstructing an edit
+// from it would silently wipe the file, so require at least 1 real char
+const LOOKS_LIKE_REAL_CONTENT = /[A-Za-z0-9_]/;
+
 function describedEdit(text: string): DescribedAction | undefined {
   CODE_FENCE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = CODE_FENCE.exec(text)) !== null) {
     const [, infoString, body] = match;
-    if (!body.trim()) {
+    if (!body.trim() || !LOOKS_LIKE_REAL_CONTENT.test(body)) {
       continue;
     }
     const filepath =
@@ -81,16 +106,52 @@ function describedEdit(text: string): DescribedAction | undefined {
   return undefined;
 }
 
-function describedRead(
+function describedReadPending(
   text: string,
   pending: string[],
 ): DescribedAction | undefined {
-  const mentioned = extractFilePathMentions(text);
-  const filepath =
-    mentioned.find((path) => pending.includes(path)) ??
-    (READ_INTENT.test(text) ? mentioned.at(-1) : undefined);
+  const filepath = extractFilePathMentions(text).find((path) =>
+    pending.includes(path),
+  );
   return filepath
     ? { toolName: BuiltInToolNames.ReadFile, args: { filepath } }
+    : undefined;
+}
+
+function describedReadFallback(text: string): DescribedAction | undefined {
+  if (!READ_INTENT.test(text)) {
+    return undefined;
+  }
+  const filepath = extractFilePathMentions(text).at(-1);
+  return filepath
+    ? { toolName: BuiltInToolNames.ReadFile, args: { filepath } }
+    : undefined;
+}
+
+// "I will run X to verify..." has no call syntax to recover, unlike an edit (fence)
+// or read (just a path) - so reconstruct it, but only against known verify targets/exts
+function describedRun(
+  text: string,
+  verifyTargets: string[],
+): DescribedAction | undefined {
+  if (verifyTargets.length === 0 || !RUN_INTENT.test(text)) {
+    return undefined;
+  }
+  const mentioned = extractFilePathMentions(text);
+  const filepath =
+    mentioned.find((path) =>
+      verifyTargets.some((v) => path.includes(v) || v.includes(path)),
+    ) ?? (verifyTargets.length === 1 ? verifyTargets[0] : undefined);
+  if (!filepath) {
+    return undefined;
+  }
+  const ext = filepath.split(".").pop()?.toLowerCase();
+  const interpreter = ext ? INTERPRETER_BY_EXTENSION[ext] : undefined;
+  return interpreter
+    ? {
+        toolName: BuiltInToolNames.RunTerminalCommand,
+        args: { command: `${interpreter} ${filepath}` },
+      }
     : undefined;
 }
 

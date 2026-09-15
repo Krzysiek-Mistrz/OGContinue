@@ -47,6 +47,17 @@ const PROVIDER_HANDLES_TEMPLATING: string[] = [
   "lmstudio",
   "openai",
   "ollama",
+  // Missing from this list meant every llama.cpp model whose name matched a
+  // legacy substring (e.g. "gemma") got a hand-built templateMessages
+  // function assigned (autodetectTemplateFunction below) - which routes
+  // BaseLLM.streamChat through _streamComplete's raw /completions prompt
+  // string instead of _streamChat's /v1/chat/completions with real tool
+  // schemas. That legacy template drops the system message entirely and
+  // never mentions tools, so the model had no idea what tools existed or
+  // how to call them and resorted to inventing its own syntax from scratch
+  // on every turn - this is the actual cause of the garbled Gemma output,
+  // not a text-recovery gap.
+  "llama.cpp",
   "together",
   "novita",
   "msty",

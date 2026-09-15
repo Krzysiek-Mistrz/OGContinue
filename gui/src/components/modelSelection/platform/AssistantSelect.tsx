@@ -1,11 +1,11 @@
 import {
   ArrowPathIcon,
-  ArrowTopRightOnSquareIcon,
   BuildingOfficeIcon,
   ChevronDownIcon,
   Cog6ToothIcon,
   ExclamationTriangleIcon,
   PlusIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../../context/Auth";
@@ -16,12 +16,14 @@ import {
   setSelectedProfile,
 } from "../../../redux";
 import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
+import { setDialogMessage, setShowDialog } from "../../../redux/slices/uiSlice";
 import {
   fontSize,
   getMetaKeyLabel,
-  isLocalProfile,
+  isLocalAssistantFile,
   isMetaEquivalentKeyPressed,
 } from "../../../util";
+import ConfirmationDialog from "../../dialogs/ConfirmationDialog";
 import {
   Listbox,
   ListboxButton,
@@ -61,6 +63,7 @@ const AssistantSelectOption = ({
 
   const dispatch = useAppDispatch();
   const ideMessenger = useContext(IdeMessengerContext);
+  const { refreshProfiles } = useAuth();
 
   function handleOptionClick() {
     // optimistic update
@@ -74,6 +77,29 @@ const AssistantSelectOption = ({
 
   function handleConfigure() {
     ideMessenger.post("config/openProfile", { profileId: profile.id });
+    onClick();
+  }
+
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    // window.confirm is a no-op in a vscode webview, need our own dialog
+    dispatch(
+      setDialogMessage(
+        <ConfirmationDialog
+          title="Delete assistant"
+          text={`Delete "${profile.title}"? This removes its config file and can't be undone.`}
+          confirmText="Delete"
+          onConfirm={async () => {
+            await ideMessenger.request("config/deleteLocalAssistant", {
+              profileId: profile.id,
+            });
+            await refreshProfiles();
+          }}
+        />,
+      ),
+    );
+    dispatch(setShowDialog(true));
     onClick();
   }
 
@@ -124,23 +150,18 @@ const AssistantSelectOption = ({
                 }}
               />
             )}
-            {isLocalProfile(profile) ? (
-              <Cog6ToothIcon
-                className="text-lightgray h-3 w-3 flex-shrink-0 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleConfigure();
-                }}
-              />
-            ) : (
-              <ArrowTopRightOnSquareIcon
-                className="text-lightgray h-3 w-3 flex-shrink-0 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleConfigure();
-                }}
+            <Cog6ToothIcon
+              className="text-lightgray h-3 w-3 flex-shrink-0 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                handleConfigure();
+              }}
+            />
+            {isLocalAssistantFile(profile.id) && (
+              <TrashIcon
+                className="text-lightgray h-3 w-3 flex-shrink-0 cursor-pointer hover:text-red-500"
+                onClick={handleDelete}
               />
             )}
           </div>
@@ -239,12 +260,7 @@ export default function AssistantSelect() {
   if (!selectedProfile) {
     return (
       <div
-        onClick={() => {
-          ideMessenger.request("controlPlane/openUrl", {
-            path: "/new?type=assistant",
-            orgSlug: currentOrg?.slug,
-          });
-        }}
+        onClick={onNewAssistant}
         className="flex cursor-pointer select-none items-center gap-1 text-gray-400"
         style={{ fontSize: smallFont }}
       >

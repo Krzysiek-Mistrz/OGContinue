@@ -4,7 +4,10 @@ import { ChatMessage, CompletionOptions, LLMOptions } from "../../index.js";
 import { renderChatMessage } from "../../util/messageContent.js";
 import { BaseLLM } from "../index.js";
 import { streamSse } from "../stream.js";
-import { tryRecoverToolCallFromText } from "./Ollama.js";
+import {
+  tryRecoverPythonCallFromText,
+  tryRecoverToolCallFromText,
+} from "./Ollama.js";
 
 interface LlamaCppToolCall {
   id?: string;
@@ -27,6 +30,25 @@ interface LlamaCppChatResponse {
   }>;
 }
 
+// A misconfigured or template-less llama-server (missing --chat-template /
+// --jinja, or a GGUF whose embedded template isn't picked up) can fail to
+// stop generation at a turn boundary, letting literal turn markers like
+// Gemma's <end_of_turn> leak into the text as content instead of ending the
+// response - the model then narrates several "turns" back to back in one
+// completion. Sending these as stop sequences catches that server-side even
+// when the template itself doesn't.
+const DEFAULT_TURN_STOP_SEQUENCES = [
+  "<end_of_turn>",
+  "<start_of_turn>",
+  "</start_of_turn>",
+  "<end_turn>",
+  "<start_turn>",
+];
+
+function mergeStopSequences(stop: string[] | undefined): string[] {
+  return [...new Set([...(stop ?? []), ...DEFAULT_TURN_STOP_SEQUENCES])];
+}
+
 class LlamaCpp extends BaseLLM {
   static providerName = "llama.cpp";
   static defaultOptions: Partial<LLMOptions> = {
@@ -41,7 +63,7 @@ class LlamaCpp extends BaseLLM {
       presence_penalty: options.presencePenalty,
       min_p: options.minP,
       mirostat: options.mirostat,
-      stop: options.stop,
+      stop: mergeStopSequences(options.stop),
       top_k: options.topK,
       top_p: options.topP,
       temperature: options.temperature,
@@ -137,7 +159,7 @@ class LlamaCpp extends BaseLLM {
       top_p: options.topP,
       top_k: options.topK,
       max_tokens: options.maxTokens,
-      stop: options.stop,
+      stop: mergeStopSequences(options.stop),
       stream,
     };
 
@@ -168,9 +190,13 @@ class LlamaCpp extends BaseLLM {
     }): Generator<ChatMessage> {
       let remainingText = recovered.remainingText;
       for (
-        let extra = tryRecoverToolCallFromText(remainingText, validToolNames);
+        let extra =
+          tryRecoverToolCallFromText(remainingText, validToolNames) ??
+          tryRecoverPythonCallFromText(remainingText, options.tools ?? []);
         extra !== null;
-        extra = tryRecoverToolCallFromText(remainingText, validToolNames)
+        extra =
+          tryRecoverToolCallFromText(remainingText, validToolNames) ??
+          tryRecoverPythonCallFromText(remainingText, options.tools ?? [])
       ) {
         remainingText = extra.remainingText;
       }
@@ -217,13 +243,14 @@ class LlamaCpp extends BaseLLM {
         }));
       }
 
-      // Small models often print the call as plain JSON text instead of
-      // triggering llama.cpp's own template-based tool-call parsing.
+      // Small models often print the call as plain JSON text, or as
+      // Python-call syntax (builtin_tool("arg")), instead of triggering
+      // llama.cpp's own template-based tool-call parsing.
       if (!chatMessage.toolCalls?.length && validToolNames.length) {
-        const recovered = tryRecoverToolCallFromText(
-          renderChatMessage(chatMessage),
-          validToolNames,
-        );
+        const text = renderChatMessage(chatMessage);
+        const recovered =
+          tryRecoverToolCallFromText(text, validToolNames) ??
+          tryRecoverPythonCallFromText(text, options.tools ?? []);
         if (recovered) {
           yield* emitRecoveredToolCall(recovered);
           return;

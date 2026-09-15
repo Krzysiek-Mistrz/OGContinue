@@ -121,6 +121,11 @@ export const PROVIDER_TOOL_SUPPORT: Record<
     // above and otherwise let the user try Agent mode themselves. It's much better approach imo
     return true;
   },
+  "llama.cpp": (model) => {
+    // llama-server serves whatever GGUF the user pointed it at - no registry
+    // to check against, so same policy as Ollama: trust the user, don't gate.
+    return true;
+  },
   sambanova: (model) => {
     // https://docs.sambanova.ai/cloud/docs/capabilities/function-calling
     if (

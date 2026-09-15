@@ -69,14 +69,14 @@ function installNodeModules() {
   console.log("[info] npm install in gui completed");
 }
 
-async function buildGui(isGhAction) {
+async function buildGui() {
   // Make sure we are in the right directory
   if (!process.cwd().endsWith("gui")) {
     process.chdir(path.join(continueDir, "gui"));
   }
-  if (isGhAction) {
-    execCmdSync("npm run build");
-  }
+  // Always rebuild - skipping this locally silently packages a stale
+  // gui/dist from whenever it was last built, with no warning.
+  execCmdSync("npm run build");
 
   // Copy over the dist folder to the VSCode extension //
   const vscodeGuiPath = path.join("../extensions/vscode/gui");

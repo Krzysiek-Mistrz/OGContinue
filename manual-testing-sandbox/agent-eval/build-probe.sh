@@ -39,12 +39,12 @@ TS
 sed -i "s|ROOT|$ROOT|g" "$TMP/dump.ts"
 
 "$ESBUILD" "$TMP/dump.ts" --bundle --platform=node --format=cjs \
-  --external:sqlite3 --outfile=recover.cjs --log-level=error
+  --external:sqlite3 --external:sqlite --outfile=recover.cjs --log-level=error
 
 node -r ./sqlite-stub.cjs recover.cjs tools > tools.json
 node -r ./sqlite-stub.cjs recover.cjs system > agent-system-message.txt
 
 "$ESBUILD" runner-entry.ts --bundle --platform=node --format=cjs \
-  --external:sqlite3 --outfile=runner.cjs --log-level=error
+  --external:sqlite3 --external:sqlite --outfile=runner.cjs --log-level=error
 
 echo "rebuilt tools.json, agent-system-message.txt, recover.cjs, runner.cjs"

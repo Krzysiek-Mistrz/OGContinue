@@ -89,9 +89,10 @@ void (async () => {
   execCmdSync("npm install");
   console.log("[info] npm install in gui completed");
 
-  if (isInGitHubAction) {
-    execCmdSync("npm run build");
-  }
+  // Always rebuild - skipping this locally silently packages a stale
+  // gui/dist from whenever it was last built, with no warning.
+  execCmdSync("npm run build");
+  console.log("[info] npm run build in gui completed");
 
   // Copy over the dist folder to the VSCode extension //
   const vscodeGuiPath = path.join("../extensions/vscode/gui");

@@ -7,14 +7,26 @@
  * task_complete gate - so a green run says those actually carry a task to
  * completion with a given model.
  *
+ * The LLM call itself goes through the real provider classes'
+ * `streamChat()` - the exact method `core/llm/streamChat.ts`'s
+ * `llmStreamChat` calls for a real GUI turn - instead of a hand-rolled
+ * fetch. A hand-rolled request can silently diverge from what the real
+ * extension sends (it did: a model-name-based legacy prompt template was
+ * getting swapped in ahead of the real chat/tools path for every llama.cpp
+ * model, see core/llm/autodetect.ts's PROVIDER_HANDLES_TEMPLATING, and a
+ * hand-rolled request would never have caught that no matter how many runs
+ * passed).
+ *
  * What it is NOT: the VS Code layer. The IDE below is a plain filesystem
  * implementation, and edits are applied directly instead of through the
  * accept/reject diff UI, which cannot be clicked from here. So this cannot
  * catch a bug in ApplyManager or in VS Code path resolution - only a real run
  * in the editor does that.
  */
+import { ChatMessage, Tool } from "../../core";
 import { DEFAULT_AGENT_SYSTEM_MESSAGE } from "../../core/llm/constructMessages";
-import { tryRecoverToolCallFromText } from "../../core/llm/llms/Ollama";
+import LlamaCpp from "../../core/llm/llms/LlamaCpp";
+import Ollama from "../../core/llm/llms/Ollama";
 import { BuiltInToolNames } from "../../core/tools/builtIn";
 import { callTool } from "../../core/tools/callTool";
 import { allTools } from "../../core/tools/index";
@@ -42,88 +54,51 @@ const MAX_NUDGE_ATTEMPTS = 2;
 interface Step {
   tool: string;
   args: any;
-  how: "native" | "recovered" | "reconstructed";
+  how: "native" | "reconstructed";
   ok: boolean;
   detail: string;
 }
 
-async function chatOllama(model: string, messages: any[]) {
-  const response = await fetch(`${OLLAMA}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model,
-      messages,
-      tools: allTools.map((t) => ({ type: "function", function: t.function })),
-      stream: false,
-      options: { temperature: 0.2, num_ctx: CONTEXT_LENGTH },
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `Ollama ${response.status} for ${model}: ${await response.text()}`,
-    );
-  }
-  return (await response.json()).message;
-}
-
-// llama-server's parser requires strict OpenAI shape: every tool_calls[i]
-// needs `type: "function"` and a stringified `arguments`, unlike Ollama's
-// looser native format that this harness's `messages` array otherwise uses.
-function toOpenAiShape(m: any) {
-  if (m.role === "assistant" && m.tool_calls?.length) {
-    return {
-      ...m,
-      tool_calls: m.tool_calls.map((tc: any) => ({
-        id: tc.id,
-        type: "function",
-        function: {
-          name: tc.function.name,
-          arguments: JSON.stringify(tc.function.arguments),
-        },
-      })),
-    };
-  }
-  return m;
-}
-
-// llama-server serves exactly one loaded GGUF, so `model` is a label only -
-// same as the real LlamaCpp provider, which never sends a `model` field.
-async function chatLlamaCpp(model: string, messages: any[]) {
-  const response = await fetch(`${LLAMACPP}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      messages: messages.map(toOpenAiShape),
-      tools: allTools.map((t) => ({ type: "function", function: t.function })),
-      stream: false,
-      temperature: 0.2,
-    }),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `llama.cpp ${response.status} for ${model}: ${await response.text()}`,
-    );
-  }
-  const message = (await response.json()).choices[0].message;
-  // OpenAI-shaped tool_calls carry stringified arguments; the rest of this
-  // loop expects the already-parsed object, matching Ollama's native shape.
-  if (message.tool_calls?.length) {
-    message.tool_calls = message.tool_calls.map((tc: any) => ({
-      ...tc,
-      function: {
-        ...tc.function,
-        arguments: JSON.parse(tc.function.arguments),
-      },
-    }));
-  }
-  return message;
-}
-
-async function chat(model: string, messages: any[]) {
+function createLlm(model: string) {
   return BACKEND === "llamacpp"
-    ? chatLlamaCpp(model, messages)
-    : chatOllama(model, messages);
+    ? new LlamaCpp({ model, apiBase: LLAMACPP, contextLength: CONTEXT_LENGTH })
+    : new Ollama({ model, apiBase: OLLAMA, contextLength: CONTEXT_LENGTH });
+}
+
+async function chat(
+  llm: LlamaCpp | Ollama,
+  messages: ChatMessage[],
+  tools: Tool[],
+) {
+  let content = "";
+  const toolCalls: { id?: string; name: string; arguments: string }[] = [];
+  for await (const chunk of llm.streamChat(
+    messages,
+    new AbortController().signal,
+    { temperature: 0.2, tools },
+  )) {
+    if (chunk.role === "assistant") {
+      if (typeof chunk.content === "string") {
+        content += chunk.content;
+      }
+      for (const tc of chunk.toolCalls ?? []) {
+        if (tc.function?.name) {
+          toolCalls.push({
+            id: tc.id,
+            name: tc.function.name,
+            arguments: tc.function.arguments ?? "{}",
+          });
+        }
+      }
+    }
+  }
+  return {
+    content,
+    tool_calls: toolCalls.map((tc) => ({
+      id: tc.id,
+      function: { name: tc.name, arguments: JSON.parse(tc.arguments) },
+    })),
+  };
 }
 
 function historyItem(
@@ -151,13 +126,13 @@ async function main() {
   const request = process.argv[4];
 
   const ide = createFsIde(workspace);
-  const toolNames = allTools.map((t) => t.function.name);
+  const llm = createLlm(model);
   const planTargets = extractTaskTargets(request);
   const verifyTargets = extractVerifyTargets(request);
   console.log(`model: ${model}`);
   console.log(`plan:  change ${JSON.stringify(planTargets)} verify ${JSON.stringify(verifyTargets)}\n`);
 
-  const messages: any[] = [
+  const messages: ChatMessage[] = [
     { role: "system", content: DEFAULT_AGENT_SYSTEM_MESSAGE },
     { role: "user", content: request },
   ];
@@ -177,9 +152,9 @@ async function main() {
     );
     const sent = [...messages, ...(recitation ? [recitation] : []), ...nudge];
 
-    let reply: any;
+    let reply: Awaited<ReturnType<typeof chat>>;
     try {
-      reply = await chat(model, sent);
+      reply = await chat(llm, sent, allTools);
     } catch (e: any) {
       console.log(`${step + 1}. FAILED to get a reply: ${e.message}`);
       steps.push({ tool: "(error)", args: null, how: "native", ok: false, detail: e.message });
@@ -189,18 +164,14 @@ async function main() {
 
     let name: string | undefined;
     let args: any;
-    let how: "native" | "recovered" | "reconstructed" = "native";
+    // "native" covers both an actual native tool call and one the real
+    // provider recovered from text internally - streamChat() doesn't
+    // distinguish the two on its way out, so neither does a real GUI turn.
+    let how: "native" | "reconstructed" = "native";
 
     if (reply.tool_calls?.length) {
       name = reply.tool_calls[0].function.name;
       args = reply.tool_calls[0].function.arguments;
-    } else {
-      const recovered = tryRecoverToolCallFromText(text, toolNames);
-      if (recovered) {
-        name = recovered.name;
-        args = recovered.args;
-        how = "recovered";
-      }
     }
 
     if (!name) {
@@ -261,8 +232,14 @@ async function main() {
     const toolCallId = `call_${step}`;
     messages.push({
       role: "assistant",
-      content: how === "recovered" ? "" : text,
-      tool_calls: [{ id: toolCallId, function: { name, arguments: args } }],
+      content: text,
+      toolCalls: [
+        {
+          id: toolCallId,
+          type: "function",
+          function: { name, arguments: JSON.stringify(args) },
+        },
+      ],
     });
 
     if (name === BuiltInToolNames.SetTaskPlan && Array.isArray(args?.steps)) {
@@ -292,7 +269,7 @@ async function main() {
             }
           }
         }
-        messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content: reason });
+        messages.push({ role: "tool", toolCallId, content: reason });
         history.push(historyItem(name, args, "errored"));
         steps.push({ tool: name, args, how, ok: false, detail: "rejected" });
         continue;
@@ -309,7 +286,7 @@ async function main() {
     if (!tool.readonly && identical >= 2) {
       const blocked = `${name} has already been called with exactly these arguments ${identical} times, so calling it again cannot produce a different result. Do something else.`;
       console.log(`${step + 1}. BLOCKED ${name} (repeat guard)`);
-      messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content: blocked });
+      messages.push({ role: "tool", toolCallId, content: blocked });
       steps.push({ tool: name, args, how, ok: false, detail: "blocked" });
       continue;
     }
@@ -334,7 +311,7 @@ async function main() {
     }
 
     history.push(historyItem(name, args, ok ? "done" : "errored", toolOutput));
-    messages.push({ role: "tool", tool_name: name, tool_call_id: toolCallId, content });
+    messages.push({ role: "tool", toolCallId, content });
     const label = args?.filepath ?? args?.command ?? args?.pattern ?? args?.dirPath ?? "";
     console.log(`${step + 1}. ${ok ? "ok  " : "FAIL"} ${name} ${label} (${how})`);
     if (!ok) {
@@ -346,9 +323,9 @@ async function main() {
   const finished =
     finishedByPlan ||
     (steps.at(-1)?.tool === BuiltInToolNames.TaskComplete && !!steps.at(-1)?.ok);
-  const recovered = steps.filter((s) => s.how === "recovered").length;
+  const reconstructed = steps.filter((s) => s.how === "reconstructed").length;
   console.log(
-    `\n${steps.length} steps, ${recovered} recovered from text, ended by task_complete: ${finished}`,
+    `\n${steps.length} steps, ${reconstructed} reconstructed from narration, ended by task_complete: ${finished}`,
   );
   process.exit(finished ? 0 : 1);
 }

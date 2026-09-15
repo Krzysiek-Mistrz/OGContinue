@@ -126,6 +126,10 @@ export class ReverseMessageIde {
       return this.ide.writeFile(data.path, data.contents);
     });
 
+    this.on("deleteFile", (data) => {
+      return this.ide.deleteFile(data.path);
+    });
+
     this.on("fileExists", (data) => {
       return this.ide.fileExists(data.filepath);
     });

@@ -8,9 +8,11 @@ import {
   CompletionOptions,
   LLMOptions,
   ModelInstaller,
+  Tool,
 } from "../../index.js";
 import { renderChatMessage } from "../../util/messageContent.js";
 import { getRemoteModelInfo } from "../../util/ollamaHelper.js";
+import { BuiltInToolNames } from "../../tools/builtIn.js";
 import { BaseLLM } from "../index.js";
 import { streamResponse } from "../stream.js";
 
@@ -257,6 +259,264 @@ export function tryRecoverToolCallFromText(
         return { name: bareNameMatch[1], args: parsed, remainingText };
       }
     }
+  }
+
+  return null;
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function unescapePythonString(s: string): string {
+  return s.replace(/\\(.)/g, (_, c) => {
+    switch (c) {
+      case "n":
+        return "\n";
+      case "t":
+        return "\t";
+      case "r":
+        return "\r";
+      default:
+        return c;
+    }
+  });
+}
+
+function parsePythonLiteral(token: string): unknown {
+  const t = token.trim();
+  if (t === "True") return true;
+  if (t === "False") return false;
+  if (t === "None") return null;
+  if (/^-?\d+(\.\d+)?$/.test(t)) return Number(t);
+
+  const tripleMatch = t.match(/^("""|''')([\s\S]*)\1$/);
+  if (tripleMatch) return tripleMatch[2];
+
+  const singleMatch = t.match(/^(["'])([\s\S]*)\1$/);
+  if (singleMatch) return unescapePythonString(singleMatch[2]);
+
+  return t;
+}
+
+// Scans a call's argument list starting right after its opening "(",
+// splitting on top-level commas while respecting quotes (including Python
+// triple-quotes) and nested brackets, until the matching ")" is found.
+function scanPythonCallArgs(
+  text: string,
+  start: number,
+): { args: string[]; end: number } | null {
+  let depth = 0;
+  let quote: string | null = null;
+  let current = "";
+  const args: string[] = [];
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (quote) {
+      if (quote.length === 3) {
+        if (text.slice(i, i + 3) === quote) {
+          current += quote;
+          quote = null;
+          i += 2;
+          continue;
+        }
+      } else if (ch === "\\" && i + 1 < text.length) {
+        current += ch + text[i + 1];
+        i++;
+        continue;
+      } else if (ch === quote) {
+        current += ch;
+        quote = null;
+        continue;
+      }
+      current += ch;
+      continue;
+    }
+
+    if (text.slice(i, i + 3) === '"""' || text.slice(i, i + 3) === "'''") {
+      quote = text.slice(i, i + 3);
+      current += quote;
+      i += 2;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+      current += ch;
+      continue;
+    }
+    if (ch === ")" && depth === 0) {
+      if (current.trim() !== "" || args.length > 0) {
+        args.push(current);
+      }
+      return { args, end: i };
+    }
+    if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+      current += ch;
+      continue;
+    }
+    if (ch === "," && depth === 0) {
+      args.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+
+  return null;
+}
+
+// Some models don't just print a real tool under a shortened name - they
+// invent an entirely different, plausible-sounding one (seen: "write_file",
+// "save_file" for what is really an edit of an existing file). These are
+// common enough conventions from other tools' training data that mapping
+// them onto the closest real builtin is worth it; ambiguous verbs default to
+// editing rather than creating, since agent tasks overwhelmingly edit files
+// that already exist.
+const HALLUCINATED_TOOL_NAME_ALIASES: Record<string, BuiltInToolNames> = {
+  write_file: BuiltInToolNames.EditExistingFile,
+  writefile: BuiltInToolNames.EditExistingFile,
+  save_file: BuiltInToolNames.EditExistingFile,
+  savefile: BuiltInToolNames.EditExistingFile,
+  update_file: BuiltInToolNames.EditExistingFile,
+  create_file: BuiltInToolNames.CreateNewFile,
+  new_file: BuiltInToolNames.CreateNewFile,
+};
+
+function normalizeParamKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+// The two concepts every file tool's arguments boil down to - which file,
+// and what to put in it - collapsed into equivalence classes so a
+// hallucinated keyword like "file_path" or "content" still lands on
+// whichever real parameter name ("filepath", "changes", "contents", ...)
+// the matched tool actually declares.
+const PARAM_KEY_CLASSES = [
+  ["filepath", "filepathname", "path", "filename", "file"],
+  [
+    "changes",
+    "content",
+    "contents",
+    "newcontent",
+    "code",
+    "text",
+    "data",
+    "body",
+  ],
+].map((group) => new Set(group));
+
+function resolveParamKey(
+  incomingKey: string,
+  realParamNames: string[],
+): string | undefined {
+  const norm = normalizeParamKey(incomingKey);
+  const exact = realParamNames.find((p) => normalizeParamKey(p) === norm);
+  if (exact) {
+    return exact;
+  }
+  const matchingClass = PARAM_KEY_CLASSES.find((cls) => cls.has(norm));
+  if (!matchingClass) {
+    return undefined;
+  }
+  return realParamNames.find((p) => matchingClass.has(normalizeParamKey(p)));
+}
+
+// A keyword argument, e.g. `file_path='a.py'` - the `=` must sit outside any
+// quoted value, so this only ever runs against a single already-split
+// top-level argument from scanPythonCallArgs, never the raw call text.
+const KEYWORD_ARG_PATTERN = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([\s\S]*)$/;
+
+/**
+ * Some models (seen on both llama.cpp and Ollama) narrate a tool call as
+ * Python-style call syntax - `builtin_edit_existing_file("path", "code")` -
+ * instead of the {"name": ..., "arguments": ...} object the JSON recovery
+ * above looks for. This maps the positional arguments back onto the tool's
+ * declared parameter order so the call can still be recovered and run.
+ *
+ * Gemma's code-execution convention goes a step further: it drops the
+ * "builtin_" prefix and namespaces the call under "tool_code.", e.g.
+ * `tool_code.read_file("path")` instead of `builtin_read_file("path")` -
+ * so both the short alias and an optional identifier-dot namespace prefix
+ * are matched and mapped back onto the real tool name. It also sometimes
+ * invents its own tool name and calls it with keyword arguments instead of
+ * positional ones, e.g. `file_manager.write_file(file_path='a.py',
+ * content='...')` - both HALLUCINATED_TOOL_NAME_ALIASES and
+ * resolveParamKey exist to still recover that call correctly.
+ */
+export function tryRecoverPythonCallFromText(
+  content: string,
+  tools: Tool[],
+): { name: string; args: unknown; remainingText: string } | null {
+  if (tools.length === 0) {
+    return null;
+  }
+
+  const byName = new Map(tools.map((t) => [t.function.name, t]));
+  const aliasToReal = new Map<string, string>();
+  for (const name of byName.keys()) {
+    aliasToReal.set(name, name);
+    if (name.startsWith("builtin_")) {
+      aliasToReal.set(name.slice("builtin_".length), name);
+    }
+  }
+  for (const [alias, realName] of Object.entries(
+    HALLUCINATED_TOOL_NAME_ALIASES,
+  )) {
+    if (byName.has(realName) && !aliasToReal.has(alias)) {
+      aliasToReal.set(alias, realName);
+    }
+  }
+  const aliases = [...aliasToReal.keys()].sort((a, b) => b.length - a.length);
+  if (aliases.length === 0) {
+    return null;
+  }
+  const pattern = new RegExp(
+    `(?:[A-Za-z_][A-Za-z0-9_]*\\.)?\\b(${aliases.map(escapeRegExp).join("|")})\\s*\\(`,
+    "g",
+  );
+
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(content)) !== null) {
+    const name = aliasToReal.get(match[1])!;
+    const openParenIndex = match.index + match[0].length - 1;
+    const scanned = scanPythonCallArgs(content, openParenIndex + 1);
+    if (!scanned) {
+      continue;
+    }
+
+    const tool = byName.get(name)!;
+    const paramNames = Object.keys(
+      tool.function.parameters?.properties ?? {},
+    );
+    const args: Record<string, unknown> = {};
+    scanned.args.forEach((raw, idx) => {
+      const keywordMatch = raw.match(KEYWORD_ARG_PATTERN);
+      if (keywordMatch) {
+        const key = resolveParamKey(keywordMatch[1], paramNames);
+        if (key) {
+          args[key] = parsePythonLiteral(keywordMatch[2]);
+        }
+        return;
+      }
+      const key = paramNames[idx];
+      if (key) {
+        args[key] = parsePythonLiteral(raw);
+      }
+    });
+
+    const remainingText = (
+      content.slice(0, match.index) + content.slice(scanned.end + 1)
+    ).trim();
+
+    return { name, args, remainingText };
   }
 
   return null;
@@ -714,9 +974,13 @@ class Ollama extends BaseLLM implements ModelInstaller {
       // asks again once it sees the first result.
       let remainingText = recovered.remainingText;
       for (
-        let extra = tryRecoverToolCallFromText(remainingText, validToolNames);
+        let extra =
+          tryRecoverToolCallFromText(remainingText, validToolNames) ??
+          tryRecoverPythonCallFromText(remainingText, options.tools ?? []);
         extra !== null;
-        extra = tryRecoverToolCallFromText(remainingText, validToolNames)
+        extra =
+          tryRecoverToolCallFromText(remainingText, validToolNames) ??
+          tryRecoverPythonCallFromText(remainingText, options.tools ?? [])
       ) {
         remainingText = extra.remainingText;
       }
@@ -788,10 +1052,10 @@ class Ollama extends BaseLLM implements ModelInstaller {
         !message.toolCalls?.length &&
         validToolNames.length
       ) {
-        const recovered = tryRecoverToolCallFromText(
-          renderChatMessage(message),
-          validToolNames,
-        );
+        const text = renderChatMessage(message);
+        const recovered =
+          tryRecoverToolCallFromText(text, validToolNames) ??
+          tryRecoverPythonCallFromText(text, options.tools ?? []);
         if (recovered) {
           yield* emitRecoveredToolCall(recovered);
           return;
@@ -857,10 +1121,9 @@ class Ollama extends BaseLLM implements ModelInstaller {
       }
 
       if (withheldText) {
-        const recovered = tryRecoverToolCallFromText(
-          withheldText,
-          validToolNames,
-        );
+        const recovered =
+          tryRecoverToolCallFromText(withheldText, validToolNames) ??
+          tryRecoverPythonCallFromText(withheldText, options.tools ?? []);
         if (recovered) {
           yield* emitRecoveredToolCall(recovered);
         } else {

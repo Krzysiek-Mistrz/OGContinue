@@ -117,6 +117,15 @@ export function isLocalProfile(profile: ProfileDescription): boolean {
   return profile.profileType === "local";
 }
 
+// dupe of core/config/loadLocalAssistants.ts's version - can't import that
+// one here, it drags in node fs/path/url and breaks the webview bundle
+export function isLocalAssistantFile(profileId: string): boolean {
+  if (!profileId.endsWith(".yaml") && !profileId.endsWith(".yml")) {
+    return false;
+  }
+  return profileId.replace(/\\/g, "/").includes("/.continue/assistants/");
+}
+
 /**
  * Get the base system message for the agent or chat mode from the model description.
  */

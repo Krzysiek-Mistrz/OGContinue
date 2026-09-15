@@ -63,6 +63,7 @@ export type ToCoreFromIdeOrWebviewProtocol = {
   ];
   "config/addLocalWorkspaceBlock": [{ blockType: BlockType }, void];
   "config/newLocalAssistant": [undefined, void];
+  "config/deleteLocalAssistant": [{ profileId: string }, void];
   "config/newPromptFile": [undefined, void];
   "config/ideSettingsUpdate": [IdeSettings, void];
   "config/getSerializedProfileInfo": [

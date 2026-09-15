@@ -364,6 +364,16 @@ export class Core {
       await this.configHandler.refreshAll();
     });
 
+    on("config/deleteLocalAssistant", async (msg) => {
+      const { profileId } = msg.data;
+      // "local" (base config.yaml) never matches, so it can't be deleted here
+      if (!isLocalAssistantFile(profileId)) {
+        return;
+      }
+      await this.ide.deleteFile(profileId);
+      await this.configHandler.refreshAll();
+    });
+
     on("config/openProfile", async (msg) => {
       await this.configHandler.openConfigProfile(msg.data.profileId);
     });

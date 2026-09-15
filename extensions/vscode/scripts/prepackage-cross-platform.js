@@ -66,10 +66,6 @@ const exe = os === "win32" ? ".exe" : "";
 
 console.log("[info] Using target: ", target);
 
-function ghAction() {
-  return !!process.env.GITHUB_ACTIONS;
-}
-
 function isArm() {
   return (
     target === "darwin-arm64" ||
@@ -91,7 +87,7 @@ async function package(target, os, arch, exe) {
   installNodeModules();
 
   // Build gui and copy to extensions
-  await buildGui(ghAction());
+  await buildGui();
 
   // Assets
   // Copy tree-sitter-wasm files

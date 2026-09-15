@@ -1,6 +1,4 @@
-# Fully local setup
-
-This guide covers running OGContinue entirely against local models via [Ollama](https://ollama.com), no API keys or cloud calls required.
+ via [Ollama](https://ollama.com), no API keys or cloud calls required.
 
 ## Recommended models by GPU VRAM
 
@@ -190,7 +188,8 @@ The `llama.cpp` provider talks to `llama-server`'s OpenAI-compatible API and
 supports native + text-recovered tool calling in Agent mode, same as Ollama.
 Unlike Ollama, one `llama-server` process serves exactly one loaded GGUF, so
 running chat and autocomplete models at the same time means one `llama-server`
-per role, each on its own port:
+per role, each on its own port. `~/models/` below is just a placeholder -
+point `-m` at wherever you actually downloaded your GGUFs:
 
 ```bash
 llama-server -m ~/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf \
@@ -201,6 +200,9 @@ llama-server -m ~/models/qwen2.5-coder-1.5b-base-q8_0.gguf \
 
 llama-server -m ~/models/nomic-embed-text-v1.5.f16.gguf \
   --embedding --pooling mean -ub 2048 --host 127.0.0.1 --port 8082
+
+llama-server -m ~/models/gemma-4-E4B_q4_0-it.gguf \
+  -ngl 99 -c 8192 --host 127.0.0.1 --port 8080 --jinja
 ```
 
 ```yaml
@@ -242,6 +244,48 @@ context:
   - provider: codebase
 ```
 
+Same setup with gemma4 instead of Qwen2.5-Coder for chat/edit/apply:
+
+```yaml
+name: Local Assistant
+version: 1.0.0
+schema: v1
+models:
+  - name: Gemma4 E4B (llama.cpp)
+    provider: llama.cpp
+    model: gemma4-e4b-q4
+    apiBase: http://127.0.0.1:8080/
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Qwen2.5 Coder 1.5B Base (llama.cpp)
+    provider: llama.cpp
+    model: qwen2.5-coder-1.5b-base
+    apiBase: http://127.0.0.1:8081/
+    roles:
+      - autocomplete
+
+  - name: Nomic Embed (llama.cpp)
+    provider: llama.cpp
+    model: nomic-embed-text
+    apiBase: http://127.0.0.1:8082/
+    roles:
+      - embed
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
+  - provider: problems
+  - provider: folder
+  - provider: codebase
+```
+
+
 Full parity with Ollama, `embed` included: `LlamaCpp` in this fork implements
 chat/edit/apply/autocomplete and `_embed`, the last one hitting `llama-server`'s
 `/v1/embeddings`. The only structural difference from Ollama is that one
@@ -250,6 +294,40 @@ different model needs its own server on its own port - the embedding model is
 tiny, so a third instance alongside the other two costs little VRAM. `model:`
 under `llama.cpp` is just a label for the UI; the server only ever serves
 whatever GGUF it was started with, so it doesn't need to match anything.
+
+
+## Using a GGUF model with Ollama instead of llama.cpp
+
+Ollama doesn't read `.gguf` files directly - it needs a `Modelfile` pointing
+at one, then an `ollama create` step to register it under a name you can use
+in `config.yaml` like any other Ollama model:
+
+```bash
+cat > Modelfile <<'EOF'
+FROM ./Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf
+EOF
+
+ollama create qwen2.5-coder-7b-gguf -f Modelfile
+ollama list   # confirm it shows up
+```
+
+Then reference it exactly like any pulled model:
+
+```yaml
+  - name: Qwen2.5 Coder 7B (from GGUF)
+    provider: ollama
+    model: qwen2.5-coder-7b-gguf
+    roles:
+      - chat
+      - edit
+      - apply
+```
+
+This is the reverse direction of the llama.cpp setup above - useful if you'd
+rather keep a single Ollama daemon running everything instead of one
+`llama-server` process per role. A `Modelfile` can also set `PARAMETER` and
+`TEMPLATE` values (see `ollama create --help`), but a bare `FROM` line is
+enough for most GGUFs that already have their chat template baked in.
 
 ## 4 paid models suggested config:
 
@@ -377,7 +455,7 @@ This is a **manual fallback**, mainly relevant to Agent mode: if the model descr
 
 Ollama's native tool-calling depends on the model's chat template emitting a specific token sequence, which small quantized models (7B-class and below) don't always trigger reliably. To keep Agent mode usable on hardware that can only run those models, OGContinue adds several layers of recovery on top of Ollama, all transparent to you:
 
-- **Tool calls printed as plain text are recovered.** If the model prints `{"name": "...", "arguments": {...}}` as a message instead of a real tool call - including when the response is cut off before the closing `}` - it's parsed back into a real call rather than shown as raw JSON. A bare `tool_name {"arg": "value"}` form (name printed before the arguments object, with no `name`/`arguments` wrapper - common with Qwen/Hermes-style models) is recognized the same way.
+- **Tool calls printed as plain text are recovered.** If the model prints `{"name": "...", "arguments": {...}}` as a message instead of a real tool call - including when the response is cut off before the closing `}` - it's parsed back into a real call rather than shown as raw JSON. A bare `tool_name {"arg": "value"}` form (name printed before the arguments object, with no `name`/`arguments` wrapper - common with Qwen/Hermes-style models) is recognized the same way. A model that instead narrates the call as Python-style syntax - `builtin_edit_existing_file("path", "new content")`, sometimes inside a ```python fence - is also recovered, by mapping its positional arguments onto the tool's declared parameter order.
 - **Paths are resolved tolerantly.** Small models frequently get a path slightly wrong (missing a leading folder, an extra one, an absolute path copied from a terminal error). Read, edit, list, and create-file all fall back to a workspace-wide search for the file or folder before giving up, and a failed read/edit tells the model the real path instead of just failing.
 - **A turn ends by calling an explicit `task_complete` tool.** Otherwise "finished" has to be guessed at - from whether the model happened to call another tool, or from whether its prose sounds like a conclusion - and a finished turn looks exactly like a stalled one. The call is checked before it's accepted: if a file the request named hasn't been edited, or something it asked to be verified hasn't been, the tool answers with what's left instead of ending the turn.
 - **A file with a pending diff reads back as it will look once accepted.** While a change waits for your accept/reject, the removed lines aren't deleted from the document - they're replaced by blank lines, with the old text held in a decoration. So an agent that read a file it had just edited got back something matching neither its edit nor the original, couldn't confirm its own change, and would re-edit or stall until you clicked accept. Reads now skip those placeholders, so you no longer have to accept a diff quickly to keep the agent moving.

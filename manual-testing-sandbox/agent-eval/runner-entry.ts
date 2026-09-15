@@ -1,28 +1,11 @@
-/**
- * A headless agent loop for checking the harness end to end.
- *
- * Everything that decides behaviour is imported from the extension's own
- * source - the system message, the tool definitions, the tool implementations,
- * the plain-text tool-call recovery, the task-state recitation and the
- * task_complete gate - so a green run says those actually carry a task to
- * completion with a given model.
- *
- * The LLM call itself goes through the real provider classes'
- * `streamChat()` - the exact method `core/llm/streamChat.ts`'s
- * `llmStreamChat` calls for a real GUI turn - instead of a hand-rolled
- * fetch. A hand-rolled request can silently diverge from what the real
- * extension sends (it did: a model-name-based legacy prompt template was
- * getting swapped in ahead of the real chat/tools path for every llama.cpp
- * model, see core/llm/autodetect.ts's PROVIDER_HANDLES_TEMPLATING, and a
- * hand-rolled request would never have caught that no matter how many runs
- * passed).
- *
- * What it is NOT: the VS Code layer. The IDE below is a plain filesystem
- * implementation, and edits are applied directly instead of through the
- * accept/reject diff UI, which cannot be clicked from here. So this cannot
- * catch a bug in ApplyManager or in VS Code path resolution - only a real run
- * in the editor does that.
- */
+// headless agent loop 4 checking the harness end to end
+// pulls system msg/tools/recovery/task-state logic straight from ext source, so a
+// green run actually means smth for a given model
+// llm call goes thru the real streamChat() (same as a real gui turn) not a hand-rolled
+// fetch - a hand-rolled req can silently diverge from what the ext really sends (it did,
+// see autodetect.ts's PROVIDER_HANDLES_TEMPLATING)
+// NOT the vscode layer tho - ide here is plain fs, edits applied directly, no diff ui.
+// can't catch ApplyManager/vscode path-resolution bugs, only a real editor run does that
 import { ChatMessage, Tool } from "../../core";
 import { DEFAULT_AGENT_SYSTEM_MESSAGE } from "../../core/llm/constructMessages";
 import LlamaCpp from "../../core/llm/llms/LlamaCpp";
@@ -164,9 +147,7 @@ async function main() {
 
     let name: string | undefined;
     let args: any;
-    // "native" covers both an actual native tool call and one the real
-    // provider recovered from text internally - streamChat() doesn't
-    // distinguish the two on its way out, so neither does a real GUI turn.
+    // "native" = real native call OR provider-recovered - streamChat() doesn't tell them apart
     let how: "native" | "reconstructed" = "native";
 
     if (reply.tool_calls?.length) {
@@ -175,14 +156,19 @@ async function main() {
     }
 
     if (!name) {
-      const { pending } = collectTaskProgress(history, planTargets, verifyTargets);
-      const described = describedAction(text, pending);
+      const { pending, unverified } = collectTaskProgress(
+        history,
+        planTargets,
+        verifyTargets,
+      );
+      const described = describedAction(text, pending, unverified);
       const repeat =
         described &&
         history.some(
           (item) =>
             item.toolCallState.toolCall.function.name === described.toolName &&
-            item.toolCallState.parsedArgs?.filepath === described.args.filepath,
+            JSON.stringify(item.toolCallState.parsedArgs ?? {}) ===
+              JSON.stringify(described.args),
         );
       if (described && !repeat) {
         name = described.toolName;
@@ -193,6 +179,11 @@ async function main() {
 
     if (!name) {
       const done = collectTaskProgress(history, planTargets, verifyTargets);
+      if (process.env.EVAL_DEBUG) {
+        console.log(
+          `      DEBUG progress: pending=${JSON.stringify(done.pending)} unverified=${JSON.stringify(done.unverified)}`,
+        );
+      }
       if (
         planTargets.length > 0 &&
         done.pending.length === 0 &&

@@ -7,6 +7,8 @@
 </div>
 
 > "Continue" and the Continue logo are trademarks of Continue Dev, Inc. This is an independent, unofficial fork; no trademark rights are claimed or implied.
+>
+> **Maintainer note:** This is a solo, spare-time project. I mostly get to work on it during summer/vacation breaks, so support, issue responses, and new releases can be slow the rest of the year — thanks for your patience.
 
 <div align="center">
 

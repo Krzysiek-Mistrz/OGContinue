@@ -13,6 +13,8 @@
 > "Continue" and the Continue logo are trademarks of Continue Dev, Inc. This is an independent, unofficial fork; no trademark rights are claimed or implied.
 >
 > **Platform focus:** OGContinue targets **VS Code only**. The JetBrains/IntelliJ and CLI variants inherited from upstream have been removed from this repo — all effort goes into making the VS Code extension work well.
+>
+> **Maintainer note:** This is a solo, spare-time project. I mostly get to work on it during summer/vacation breaks, so support, issue responses, and new releases can be slow the rest of the year — thanks for your patience.
 
 <div align="center">
 

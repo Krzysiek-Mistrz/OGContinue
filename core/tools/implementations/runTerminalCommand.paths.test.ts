@@ -27,21 +27,33 @@ describe("terminal command failure hints", () => {
     },
   } as unknown as IDE;
 
+  // command actually runs for real, so the corrected path needs a real file
+  // behind it too, or the retry the impl now does would fail for real
+  fs.mkdirSync(path.join(rootPath, "agent-test-app/src"), { recursive: true });
+  fs.writeFileSync(
+    path.join(rootPath, "agent-test-app/src/main.py"),
+    "print('hi')\n",
+  );
+
   afterAll(() => {
     fs.rmSync(rootPath, { recursive: true, force: true });
   });
 
-  test("points at the real location of a path the command got wrong", async () => {
+  test("retries with the corrected path and succeeds", async () => {
     const result = await runTerminalCommandImpl(
       { command: "python src/main.py" },
       { ide, toolCallId: "t1" } as any,
     );
     const content = result[0].content;
 
-    expect(content).toContain(`The command ran in ${rootPath}`);
     expect(content).toContain(
-      '"src/main.py" does not exist relative to the working directory, but "agent-test-app/src/main.py" does.',
+      "retried with the path corrected (src/main.py -> agent-test-app/src/main.py)",
     );
+    expect(content).toContain("$ python agent-test-app/src/main.py");
+    expect(content).toContain("hi");
+    // "ran in X" only gets appended on failure (see the other test below) -
+    // the retry succeeded, so none of that extra context is expected here
+    expect(result[0].status).not.toMatch(/^Command failed/);
   });
 
   test("says nothing extra when the command succeeds", async () => {

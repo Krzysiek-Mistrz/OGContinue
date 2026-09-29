@@ -41,7 +41,6 @@ import {
   xWinCoderEditPrompt,
   zephyrEditPrompt,
 } from "./templates/edit.js";
-import { PROVIDER_TOOL_SUPPORT } from "./toolSupport.js";
 
 const PROVIDER_HANDLES_TEMPLATING: string[] = [
   "lmstudio",
@@ -110,11 +109,8 @@ function modelSupportsTools(modelDescription: ModelDescription) {
   if (modelDescription.capabilities?.tools !== undefined) {
     return modelDescription.capabilities.tools;
   }
-  const providerSupport = PROVIDER_TOOL_SUPPORT[modelDescription.provider];
-  if (!providerSupport) {
-    return false;
-  }
-  return providerSupport(modelDescription.model) ?? false;
+  // trust the user -> if they picked a model for agent mode, let them use it
+  return true;
 }
 
 function modelSupportsImages(

@@ -9,6 +9,51 @@ at tag `v1.0.10-vscode`. This file starts fresh from the fork point — see
 for what's different from upstream, and upstream's own changelog for history
 before this point.
 
+## 1.2.5 - 2026-09-29
+### Fixed
+* The actual root cause of Gemma (and any other legacy-name-matching model)
+  inventing its own tool-call syntax on llama.cpp: `llama.cpp` was missing
+  from the provider list that skips the old raw-completion template, so
+  those models got routed through a hand-built template with no system
+  message and no tool schemas at all, instead of the real chat/tools
+  endpoint. No amount of prompt or sampling tuning could have fixed this -
+  the model genuinely never saw the tools it was meant to call
+* Agent mode is no longer blocked by a hardcoded provider/model-name
+  allowlist. Previously an unrecognized model name (any local
+  OpenAI-compatible server, e.g. behind llama-swap, with a name that didn't
+  start with `gpt-4`/`o3`) was silently marked "not supported" and hidden
+  from Agent mode. Every model is now trusted to support tools unless the
+  user explicitly sets `capabilities.tools: false` on it themselves
+* An agent response that only *describes* running or verifying a file
+  ("I will run `main.py` to check...") instead of calling
+  `run_terminal_command` is now reconstructed into a real call, the same
+  way a described edit or read already was
+* A stray malformed code-fence (leftover scrap from a failed tool-call
+  attempt) could be reconstructed into a real edit, silently overwriting
+  the target file with garbage. Reconstruction now requires the fence to
+  contain something that looks like actual content first
+* Tool-call recovery from plain text now also covers hallucinated tool
+  names (`write_file`/`save_file`/`create_file` and similar, mapped to the
+  real built-in tool), a namespace/object prefix before the call
+  (`tool_code.read_file(...)`), and keyword arguments in any order
+  (`file_manager.write_file(file_path=..., content=...)`)
+* llama-server (llama.cpp) required strict OpenAI-format tool-call replies;
+  responses are now shaped to match
+* Agent-mode edits are applied directly instead of round-tripping through
+  the diff UI
+* The eval harness (`manual-testing-sandbox/agent-eval`) now calls the real
+  `LlamaCpp`/`Ollama` provider classes' `streamChat` instead of hand-rolled
+  HTTP calls, so a passing eval run actually reflects what the real
+  extension does - this is what surfaced the llama.cpp templating bug above
+### Added
+* A local assistant config can now be deleted from the GUI, and multiple
+  local configs can be switched between (e.g. one set up for Gemma, another
+  for Qwen)
+* llama.cpp provider: native tool-calling and embeddings support
+### Removed
+* Remaining `FreeTrial`/hosted-proxy dead code and the `controlPlane`/
+  `openUrl` hosted-hub fallbacks, which included a broken onboarding path
+
 ## 1.2.0 - 2026-08-25
 ### Added
 * Web search tool is back, now running against a keyless DuckDuckGo scrape

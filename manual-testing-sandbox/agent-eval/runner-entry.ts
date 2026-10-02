@@ -10,6 +10,7 @@ import { ChatMessage, Tool } from "../../core";
 import { DEFAULT_AGENT_SYSTEM_MESSAGE } from "../../core/llm/constructMessages";
 import LlamaCpp from "../../core/llm/llms/LlamaCpp";
 import Ollama from "../../core/llm/llms/Ollama";
+import OpenAI from "../../core/llm/llms/OpenAI"; // means openai compatible (llama-swap, LM Studio, vLLM...) ;)
 import { BuiltInToolNames } from "../../core/tools/builtIn";
 import { callTool } from "../../core/tools/callTool";
 import { allTools } from "../../core/tools/index";
@@ -28,9 +29,18 @@ import { createFsIde } from "./runner-ide";
 
 const OLLAMA = process.env.OLLAMA_HOST ?? "http://localhost:11434";
 const LLAMACPP = process.env.LLAMACPP_HOST ?? "http://127.0.0.1:8080";
-const BACKEND = process.env.EVAL_BACKEND === "llamacpp" ? "llamacpp" : "ollama";
+const OPENAI_BASE = process.env.OPENAI_HOST ?? "http://127.0.0.1:8080/v1/";
+const OPENAI_KEY = process.env.OPENAI_KEY ?? "not-needed";
+const BACKEND =
+  process.env.EVAL_BACKEND === "llamacpp"
+    ? "llamacpp"
+    : process.env.EVAL_BACKEND === "openai"
+      ? "openai"
+      : "ollama";
 const CONTEXT_LENGTH = Number(process.env.EVAL_NUM_CTX ?? 8192);
 const MAX_STEPS = Number(process.env.MAX_STEPS ?? 30);
+const TEMPERATURE = Number(process.env.EVAL_TEMPERATURE ?? 0.2);
+const TOP_P = process.env.EVAL_TOP_P ? Number(process.env.EVAL_TOP_P) : undefined;
 
 const MAX_NUDGE_ATTEMPTS = 2;
 
@@ -43,44 +53,63 @@ interface Step {
 }
 
 function createLlm(model: string) {
+  // it sends model in the request body, which a multi-model 
+  // proxy needs to route. LlamaCpp doesn't send it at all
+  if (BACKEND === "openai") {
+    return new OpenAI({
+      model,
+      apiBase: OPENAI_BASE,
+      apiKey: OPENAI_KEY,
+      contextLength: CONTEXT_LENGTH,
+    });
+  }
   return BACKEND === "llamacpp"
     ? new LlamaCpp({ model, apiBase: LLAMACPP, contextLength: CONTEXT_LENGTH })
     : new Ollama({ model, apiBase: OLLAMA, contextLength: CONTEXT_LENGTH });
 }
 
 async function chat(
-  llm: LlamaCpp | Ollama,
+  llm: LlamaCpp | Ollama | OpenAI,
   messages: ChatMessage[],
   tools: Tool[],
 ) {
   let content = "";
-  const toolCalls: { id?: string; name: string; arguments: string }[] = [];
+  // Mirror of sessionSlice.ts's real accumulation -> single active tool call, argument
+  // fragments appended, latest non-empty name kept, instead of the old code
+  // -> only kept the first frag and silently dropped the rest
+  let toolCall: { id?: string; name: string; arguments: string } | undefined;
   for await (const chunk of llm.streamChat(
     messages,
     new AbortController().signal,
-    { temperature: 0.2, tools },
+    { temperature: TEMPERATURE, topP: TOP_P, tools },
   )) {
     if (chunk.role === "assistant") {
       if (typeof chunk.content === "string") {
         content += chunk.content;
       }
-      for (const tc of chunk.toolCalls ?? []) {
-        if (tc.function?.name) {
-          toolCalls.push({
-            id: tc.id,
-            name: tc.function.name,
-            arguments: tc.function.arguments ?? "{}",
-          });
-        }
+      const tc = chunk.toolCalls?.[0];
+      if (tc) {
+        toolCall = {
+          id: tc.id ?? toolCall?.id,
+          name: tc.function?.name ?? toolCall?.name ?? "",
+          arguments: (toolCall?.arguments ?? "") + (tc.function?.arguments ?? ""),
+        };
       }
     }
   }
   return {
     content,
-    tool_calls: toolCalls.map((tc) => ({
-      id: tc.id,
-      function: { name: tc.name, arguments: JSON.parse(tc.arguments) },
-    })),
+    tool_calls: toolCall
+      ? [
+          {
+            id: toolCall.id,
+            function: {
+              name: toolCall.name,
+              arguments: JSON.parse(toolCall.arguments || "{}"),
+            },
+          },
+        ]
+      : [],
   };
 }
 

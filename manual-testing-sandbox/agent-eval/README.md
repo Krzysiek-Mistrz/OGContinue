@@ -8,6 +8,14 @@ transcript and forming an impression.
 things by hand. This one is different on purpose: nothing here is edited by
 hand, and every run starts from an identical state, so two runs are comparable.
 
+This fixture measures whether the agent can *fix* an existing project. Two
+sibling scenarios cover what this one doesn't: whether it can *create* one
+from scratch, where nothing it needs to touch exists yet
+([`../agent-eval-scaffold/README.md`](../agent-eval-scaffold/README.md)),
+and whether it can *add a feature* to one that already works - a mix of
+both, and closer to the most common real task
+([`../agent-eval-feature/README.md`](../agent-eval-feature/README.md)).
+
 ## Running one evaluation
 
 ```bash

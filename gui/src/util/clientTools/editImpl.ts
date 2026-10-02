@@ -1,4 +1,4 @@
-import { resolveWorkspacePath } from "core/util/ideUtils";
+import { resolveNewFileUri, resolveWorkspacePath } from "core/util/ideUtils";
 import { getUriPathBasename } from "core/util/uri";
 import { ClientToolImpl } from "./callClientTool";
 
@@ -12,12 +12,19 @@ export const editToolImpl: ClientToolImpl = async (
   toolCallId,
   extras,
 ) => {
-  const firstUriMatch = await resolveWorkspacePath(
+  // fall back to creating it instead
+  // of hard-failing on "does not exist"
+  let targetUri = await resolveWorkspacePath(
     args.filepath,
     extras.ideMessenger.ide,
   );
-  if (!firstUriMatch) {
-    throw new Error(`${args.filepath} does not exist`);
+  let isNewFile = false;
+  if (!targetUri) {
+    targetUri = await resolveNewFileUri(
+      args.filepath,
+      extras.ideMessenger.ide,
+    );
+    isNewFile = true;
   }
   if (LAZY_MARKER.test(args.changes)) {
     throw new Error(
@@ -28,16 +35,18 @@ export const editToolImpl: ClientToolImpl = async (
   const contents = args.changes.endsWith("\n")
     ? args.changes
     : `${args.changes}\n`;
-  await extras.ideMessenger.ide.writeFile(firstUriMatch, contents);
-  await extras.ideMessenger.ide.openFile(firstUriMatch);
+  await extras.ideMessenger.ide.writeFile(targetUri, contents);
+  await extras.ideMessenger.ide.openFile(targetUri);
 
   return {
     respondImmediately: true,
     output: [
       {
-        name: getUriPathBasename(firstUriMatch),
+        name: getUriPathBasename(targetUri),
         description: args.filepath,
-        content: `Applied the new content of ${args.filepath}.`,
+        content: isNewFile
+          ? `${args.filepath} didn't exist yet, so it was created with this content.`
+          : `Applied the new content of ${args.filepath}.`,
       },
     ],
   };

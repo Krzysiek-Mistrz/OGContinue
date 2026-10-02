@@ -8,7 +8,10 @@ import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { resolveWorkspacePath } from "../../core/util/ideUtils";
+import {
+  resolveNewFileUri,
+  resolveWorkspacePath,
+} from "../../core/util/ideUtils";
 
 const LAZY_MARKER = /\.{3}\s*(.+?)\s*\.{3}/;
 
@@ -70,12 +73,12 @@ export function createFsIde(root: string): any {
   };
 
   ide.applyEdit = async (filepath: string, changes: string) => {
-    const resolved = await resolveWorkspacePath(filepath, ide);
+    // edit of a file that doesn't exist -> treated as scaffolding a new file instead of failure
+    let resolved = await resolveWorkspacePath(filepath, ide);
+    let isNewFile = false;
     if (!resolved) {
-      return {
-        ok: false,
-        message: `Could not find file ${filepath}. Use the list or glob tools to find the correct path.`,
-      };
+      resolved = await resolveNewFileUri(filepath, ide);
+      isNewFile = true;
     }
     if (LAZY_MARKER.test(changes)) {
       return {
@@ -87,7 +90,9 @@ export function createFsIde(root: string): any {
     await ide.writeFile(resolved, changes.endsWith("\n") ? changes : `${changes}\n`);
     return {
       ok: true,
-      message: `Edit applied. ${filepath} now contains:\n\n${changes}`,
+      message: isNewFile
+        ? `${filepath} didn't exist yet, so it was created. It now contains:\n\n${changes}`
+        : `Edit applied. ${filepath} now contains:\n\n${changes}`,
     };
   };
 

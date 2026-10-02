@@ -187,6 +187,28 @@ export async function resolveWorkspaceDir(
   and based on which workspace has the closest matching path, returns resolved URI
   If no meaninful path match just concatenates to first dir's uri
 */
+/*
+  A new file cannot be located by searching for it, but the folder it belongs
+  in usually can. Resolving that folder keeps a file the model asked for at
+  "src/util/helper.ts" out of the workspace root
+*/
+export async function resolveNewFileUri(
+  filepath: string,
+  ide: IDE,
+): Promise<string> {
+  const segments = filepath.replaceAll("\\", "/").split("/").filter(Boolean);
+
+  if (segments.length > 1) {
+    const parentDir = segments.slice(0, -1).join("/");
+    const resolvedParent = await resolveWorkspaceDir(parentDir, ide);
+    if (resolvedParent) {
+      return joinPathsToUri(resolvedParent, segments[segments.length - 1]);
+    }
+  }
+
+  return inferResolvedUriFromRelativePath(filepath, ide);
+}
+
 export async function inferResolvedUriFromRelativePath(
   _relativePath: string,
   ide: IDE,

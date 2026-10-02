@@ -99,3 +99,29 @@ describe("describedAction reconstructing a run command from narration", () => {
     expect(action?.toolName).toBe("builtin_edit_existing_file");
   });
 });
+
+describe("describedAction not reconstructing a doomed read of a not-yet-created file", () => {
+  test("'I will create X' for a pending (not-yet-existing) target is left unrecovered, not read", () => {
+    // reading a file that was never created just fails and loops the model
+    // on the same narration until nudges run out - better to fall through
+    // and let the nudge push it toward the real create call
+    const action = describedAction(
+      "I will create the `todo_cli/cli.py` file with the required `add_task` function.",
+      ["todo_cli/cli.py"],
+      [],
+    );
+    expect(action).toBeUndefined();
+  });
+
+  test("a pending target mentioned with genuine read intent is still recovered as a read", () => {
+    const action = describedAction(
+      "Let me check todo_cli/cli.py before changing it.",
+      ["todo_cli/cli.py"],
+      [],
+    );
+    expect(action).toEqual({
+      toolName: "builtin_read_file",
+      args: { filepath: "todo_cli/cli.py" },
+    });
+  });
+});

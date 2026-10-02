@@ -16,6 +16,11 @@ const PATH_LOOKBEHIND_CHARS = 300;
 const READ_INTENT =
   /\b(read|reading|open|look at|inspect|check|view|examine|contents of)\b/i;
 
+// a pending target that doesn't exist yet needs creating, not reading - if the
+// model wants to create it -> don't reconstruct a doomed read of it
+const CREATE_INTENT =
+  /\b(create|creating|write|writing|add|adding|implement|implementing|make|making|scaffold|scaffolding)\b/i;
+
 const RUN_INTENT =
   /\b(run|running|execute|executing|verify|verifying|test|testing)\b/i;
 
@@ -110,6 +115,12 @@ function describedReadPending(
   text: string,
   pending: string[],
 ): DescribedAction | undefined {
+  // "I will create X" mentions a pending path too, but reading a file that
+  // doesn't exist yet just fails - leave it unrecovered so the nudge pushes
+  // the model to actually create it instead of looping on a doomed read
+  if (CREATE_INTENT.test(text) && !READ_INTENT.test(text)) {
+    return undefined;
+  }
   const filepath = extractFilePathMentions(text).find((path) =>
     pending.includes(path),
   );

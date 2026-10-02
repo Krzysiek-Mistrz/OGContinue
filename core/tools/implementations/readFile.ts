@@ -28,7 +28,7 @@ async function describeMissingFile(
   }
 
   if (matches.length === 0) {
-    return `Could not find file ${filepath}, and no file named ${basename} exists in the workspace. Use the list or glob tools to discover the correct path.`;
+    return `Could not find file ${filepath}, and no file named ${basename} exists in the workspace. If you're trying to check whether this file exists before creating it, it doesn't - use create_new_file to make it directly instead of reading it first. Otherwise, use the list or glob tools to discover the correct path.`;
   }
 
   const shown = matches.slice(0, MAX_SUGGESTIONS);

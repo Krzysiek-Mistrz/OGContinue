@@ -20,7 +20,9 @@ jobs:
       - id: check
         working-directory: .
         run: |
-          if [[ "${{ github.event.release.tag_name }}" == v1.0.*-vscode ]]; then
+          # wer tagging as og-vX.Y.Z, so prev condition was permanently false and this
+          # workflow could never run for any release this fork actually makes
+          if [[ "${{ github.event.release.tag_name }}" == og-v* ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -202,7 +204,6 @@ jobs:
           files: |
             vsix-artifacts/*.vsix
           token: ${{ secrets.CI_GITHUB_TOKEN }}
-          repository: continuedev/continue
 
   publish:
     runs-on: ubuntu-latest

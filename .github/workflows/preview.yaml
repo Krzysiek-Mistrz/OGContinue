@@ -20,7 +20,8 @@ jobs:
       - id: check
         working-directory: .
         run: |
-          if [[ "${{ github.event.release.tag_name }}" == v1.1.*-vscode ]]; then
+          # was hardcoded to v1.1.*-vscode... -> tagging now as og-vX.Y.Z
+          if [[ "${{ github.event.release.tag_name }}" == og-v* ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -197,7 +198,6 @@ jobs:
           files: |
             vsix-artifacts/*.vsix
           token: ${{ secrets.CI_GITHUB_TOKEN }}
-          repository: continuedev/continue
           prerelease: true
 
   publish:

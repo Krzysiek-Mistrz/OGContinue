@@ -262,6 +262,19 @@ async function main() {
       ],
     });
 
+    // mirrors callCurrentTool.ts's order exactly
+    const tool = allTools.find((t) => t.function.name === name)!;
+    const identical = steps.filter(
+      (s) => s.tool === name && JSON.stringify(s.args) === JSON.stringify(args),
+    ).length;
+    if (!tool.readonly && identical >= 2) {
+      const blocked = `${name} has already been called with exactly these arguments ${identical} times, so calling it again cannot produce a different result. Do something else.`;
+      console.log(`${step + 1}. BLOCKED ${name} (repeat guard)`);
+      messages.push({ role: "tool", toolCallId, content: blocked });
+      steps.push({ tool: name, args, how, ok: false, detail: "blocked" });
+      continue;
+    }
+
     if (name === BuiltInToolNames.SetTaskPlan && Array.isArray(args?.steps)) {
       planSteps = args.steps.filter((x: unknown) => typeof x === "string");
       console.log(
@@ -297,18 +310,6 @@ async function main() {
       console.log(`${step + 1}. task_complete ACCEPTED (${how}) — turn ends`);
       steps.push({ tool: name, args, how, ok: true, detail: String(args?.summary ?? "").slice(0, 70) });
       break;
-    }
-
-    const tool = allTools.find((t) => t.function.name === name)!;
-    const identical = steps.filter(
-      (s) => s.tool === name && JSON.stringify(s.args) === JSON.stringify(args),
-    ).length;
-    if (!tool.readonly && identical >= 2) {
-      const blocked = `${name} has already been called with exactly these arguments ${identical} times, so calling it again cannot produce a different result. Do something else.`;
-      console.log(`${step + 1}. BLOCKED ${name} (repeat guard)`);
-      messages.push({ role: "tool", toolCallId, content: blocked });
-      steps.push({ tool: name, args, how, ok: false, detail: "blocked" });
-      continue;
     }
 
     let content: string;

@@ -91,8 +91,11 @@ Measured on this fixture:
 
 | Model | Runs fixing it completely | Notes |
 |-------|---------------------------|-------|
-| `qwen2.5-coder:7b-instruct-q4_K_M` | 4/5 | every tool call recovered from text, never native |
-| `gemma4-e4b-q4` | 3/3 | native tool calls, 6 steps each, no nudges |
+| `qwen2.5-coder-7b-gguf:latest` (local, Ollama) | 3/5 | most calls recovered from text; the 2 misses narrated an edit's intent ("I will fix...") with no code fence yet, which the recovery layer can't reconstruct without real content |
+| `gemma4-e4b-q4:latest` (local, Ollama) | 5/5 | native tool calls, 6 steps each, no nudges |
+| `qwen3-30b` (server, `EVAL_BACKEND=openai`) | 0/3 | fixes both files, but its fix for the empty-list crash in `calc/stats.py` raises instead of handling the case, so `main.py` still crashes; rather than re-fixing `stats.py`, it edits `main.py` itself and then repeatedly calls `task_complete` with a reworded summary each time - evades the exact-match repeat guard (also true of the real GUI, not a harness gap) and burns the whole step budget. A genuine model-reliability limitation, not a tooling issue - contrast with its 3/3 on both other scenarios |
+| `gemma4-26b` (server, `EVAL_BACKEND=openai`, `EVAL_TEMPERATURE=1.0 EVAL_TOP_P=0.95`) | 3/3 | one run triggered the repeat guard on a redundant `run_terminal_command` call and recovered cleanly - confirms the guard fires correctly |
+| `nemotron3-nano` (server, `EVAL_BACKEND=openai`) | 3/3 | 6-9 steps, occasionally recovers a call from narration but always converges |
 
 ## Checking the harness without a full run
 

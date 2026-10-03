@@ -11,31 +11,35 @@
 ## Which models are actually tested
 
 Agent mode is the demanding role, so models are measured on it rather than
-judged by reputation. The fixture in
-[`manual-testing-sandbox/agent-eval`](https://github.com/Krzysiek-Mistrz/OGContinue/tree/main/manual-testing-sandbox/agent-eval)
-gives the model a small broken project — two files to fix, in directories the
-request does not spell out, and a third file that has to run afterwards — and
-then checks the result behaviourally. A run counts only if all eight checks
-pass with no human help at any point.
+judged by reputation. Three fixtures check three different shapes of task,
+each behaviourally and each scored only if every check passes with no human help at any point:
+[`agent-eval`](https://github.com/Krzysiek-Mistrz/OGContinue/tree/main/manual-testing-sandbox/agent-eval)
+(fix a small broken project), [`agent-eval-scaffold`](https://github.com/Krzysiek-Mistrz/OGContinue/tree/main/manual-testing-sandbox/agent-eval-scaffold)
+(build a project from an empty workspace), and
+[`agent-eval-feature`](https://github.com/Krzysiek-Mistrz/OGContinue/tree/main/manual-testing-sandbox/agent-eval-feature)
+(add a feature - one new file, one existing file changed - to a project that
+already works, checked for regressions too). The table below is the
+bugfix fixture specifically; see each scenario's own README for its results.
 
 | Model | Backend | Size | Runs fixed completely | Steps | Native tool calls | Verdict |
 | ----- | ------- | ---- | --------------------- | ----- | ----------------- | ------- |
-| `gemma4-e4b-q4` | Ollama | 7.5B | 3/3 | 6-7 | yes | **Recommended.** No nudges, no repeated reads, ends by handing back cleanly |
-| `qwen2.5-coder:7b-instruct-q4_K_M` | Ollama | 7.6B | 5/5 | 5-6 | **no** | Just as reliable here, one step shorter on average. Every tool call arrives as plain text and is parsed back by the recovery layer |
+| `gemma4-e4b-q4` | Ollama | 7.5B | 5/5 | 6 | yes | **Recommended.** No nudges, no repeated reads, ends by handing back cleanly |
+| `qwen2.5-coder-7b-gguf` | Ollama | 7.6B | 3/5 | 5-9 | mixed | Reliable most of the time, mostly recovered from text; the 2 misses narrated an edit's intent ("I will fix...") with no code fence yet, which the recovery layer can't reconstruct without real content to work from |
 | `qwen2.5-coder:1.5b-base-q8_0` | Ollama | 1.5B | n/a | - | n/a | Autocomplete only — a base model, not for chat or agent |
 | `Qwen3-4B-Instruct-2507-Q4_K_M` | llama.cpp | 4B | 1/5 | 11-30 | yes | Native tool calls work cleanly over llama.cpp, but the model itself loops - hits the repeat guard and burns steps re-running the same failed command instead of reading the error. Not recommended for Agent mode |
 | `Phi-4-mini-instruct-Q4_K_M` | llama.cpp | 3.8B | 0/5 | 5-6 | **no** | Never emits a native tool call even with `--jinja`, and narrates or prints Python-call-style pseudo-syntax (`builtin_task_complete(...)`) that this fork's JSON-shaped recovery layer isn't built to catch. Stalls out on nudges almost immediately. Not recommended |
 
-Every run of gemma4 and qwen2.5-coder:7b finished by calling the completion
-tool rather than by running out of steps or stalling; Qwen3-4B and Phi-4-mini
-did not manage that even once.
+gemma4-e4b-q4 finished by calling the completion tool in every run; the two
+heavier models below (and the two stuck ones here) did not always manage
+that. The 3 heavier server-hosted models further down are measured against
+this same fixture too, alongside the scaffold and feature ones.
 
-The `qwen2.5-coder:7b` result is the surprising one: across every run it never
-once used the tool-calling API, printing each call as prose instead. Agent
-mode on that model works entirely because those get recovered (see [Agent mode
-reliability](#agent-mode-reliability-with-small-local-models) below). That
-makes it more sensitive to changes in the harness than gemma4 is, even though
-its score here is identical.
+qwen2.5-coder-7b's recovery-layer dependence is still the notable part: a
+good chunk of its calls arrive as plain text rather than through the
+tool-calling API, so Agent mode on it leans on `tryRecoverToolCallFromText`
+working correctly (see [Agent mode
+reliability](#agent-mode-reliability-with-small-local-models) below), which
+makes it more sensitive to changes in the harness than gemma4 is.
 
 Qwen3-4B and Phi-4-mini were tried specifically as smaller, VRAM-friendlier
 alternatives on the theory that a newer, purpose-tuned small model might do
@@ -51,6 +55,21 @@ attempted here, since qwen2.5-coder:7b and gemma4-e4b-q4 already cover the
 
 The 14B and 32B rows in the VRAM table are extrapolations from the 7B result,
 not measurements — nothing that large has been run against the fixture here.
+
+### Heavier, server-hosted models (behind llama-swap)
+
+Measured on all three fixtures against a remote `llama-swap` instance - see
+the config example further down for how to point the extension at one:
+
+| Model | Bugfix (fix a broken project) | Scaffold (create from scratch) | Feature (create + edit a working project) | Notes |
+| ----- | ------------------------------- | ------------------------------- | ------------------------------------------- | ----- |
+| `qwen3-30b` (Qwen3-30B-A3B) | **0/3** | 3/3 | 3/3 | Solid on the other two, but trips on the bugfix fixture's empty-list edge case: its fix for `calc/stats.py` raises instead of handling it, and rather than going back to re-fix it, it patches `main.py` instead and repeats `task_complete` with a reworded summary each time until the step budget runs out |
+| `gemma4-26b` (Gemma4-26B-A4B, `temperature: 1.0`, `topP: 0.95`) | 3/3 | 3/3 | 2/3 | 1 feature-scenario run hit a transient network disconnect to the server mid-stream, unrelated to the extension; the bugfix fixture's repeat guard correctly caught a redundant terminal command in one run |
+| `nemotron3-nano` (Nemotron-3-Nano-30B-A3B) | 3/3 | 3/3 | 3/3 | Occasionally re-reads a file several times before editing it, or recovers a call from narration instead of calling natively - wasteful but harmless, still finishes correctly every run |
+
+All three are MoE models most 6-12 GB consumer cards can't run at full
+precision, hence testing them server-hosted rather than listing them in the
+VRAM table above.
 
 To measure a model yourself, against Ollama:
 
@@ -295,6 +314,101 @@ tiny, so a third instance alongside the other two costs little VRAM. `model:`
 under `llama.cpp` is just a label for the UI; the server only ever serves
 whatever GGUF it was started with, so it doesn't need to match anything.
 
+
+## Suggested `config.yaml` for a remote server (llama-swap / any OpenAI-compatible proxy)
+
+If your models run on a separate machine behind a multi-model proxy like
+[llama-swap](https://github.com/mostlygeek/llama-swap) rather than a bare
+`llama-server`, use `provider: openai` with that proxy's address as
+`apiBase` - it's the same wire protocol `llama-server` speaks, but a proxy
+like llama-swap needs the `model` field in the request to route to the
+right backend, which is exactly what the `openai` provider sends (`llama.cpp`
+as a provider here is built for a single-model server and never sends it).
+Swap in your own host - `ai-server.example.com` below is a placeholder:
+
+```yaml
+name: Remote Local Server
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen3 30B-A3B (server)
+    provider: openai
+    model: qwen3-30b
+    apiBase: http://ai-server.example.com:11434/v1
+    apiKey: "not-needed"
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Gemma4 26B-A4B (server)
+    provider: openai
+    model: gemma4-26b
+    apiBase: http://ai-server.example.com:11434/v1
+    apiKey: "not-needed"
+    defaultCompletionOptions:
+      temperature: 1.0
+      topP: 0.95
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Nemotron 3 Nano 30B-A3B (server)
+    provider: openai
+    model: nemotron3-nano
+    apiBase: http://ai-server.example.com:11434/v1
+    apiKey: "not-needed"
+    defaultCompletionOptions:
+      temperature: 0.2
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text-v1.5.f16-gguf:latest
+    roles:
+      - embed
+
+context:
+  - provider: code
+  - provider: docs
+  - provider: diff
+  - provider: terminal
+  - provider: problems
+  - provider: folder
+  - provider: codebase
+```
+
+`apiKey: "not-needed"` is only a placeholder value - llama-swap doesn't check
+it by default, but the field has to be present and non-empty or some clients
+refuse to send the request at all. Mixing providers in one config (an
+`openai` endpoint for chat/edit/apply, `ollama` for embeddings) works fine;
+each role is resolved independently.
+
+To measure a model behind a proxy like this yourself, without opening VS
+Code at all, point the eval harness at it with `EVAL_BACKEND=openai` (see
+"Which models are actually tested" above and each scenario's own README for
+details):
+
+```bash
+cd manual-testing-sandbox/agent-eval-scaffold
+EVAL_BACKEND=openai OPENAI_HOST=http://ai-server.example.com:11434/v1/ \
+  ./run-eval.sh qwen3-30b 3
+```
+
+Add `EVAL_TEMPERATURE`/`EVAL_TOP_P` to match a specific model's own
+`defaultCompletionOptions` instead of the harness's flat default (useful for
+a model tuned away from the usual `temperature: 0.2`, like Gemma above):
+
+```bash
+EVAL_BACKEND=openai OPENAI_HOST=http://ai-server.example.com:11434/v1/ \
+  EVAL_TEMPERATURE=1.0 EVAL_TOP_P=0.95 ./run-eval.sh gemma4-26b 3
+```
 
 ## Using a GGUF model with Ollama instead of llama.cpp
 

@@ -9,6 +9,60 @@ at tag `v1.0.10-vscode`. This file starts fresh from the fork point — see
 for what's different from upstream, and upstream's own changelog for history
 before this point.
 
+## 1.2.6 - 2026-10-03
+### Fixed
+* Agent mode's `create_new_file` and `run_terminal_command` tools asked for
+  manual per-call approval by default, which pauses the whole agent loop
+  until the user clicks Continue. A model that narrates its next step and
+  doesn't get the chance to take it before the turn ends looks stalled for
+  no reason - both now run automatically by default, like `edit_existing_file`
+  already did, so nothing blocks the agent mid-task
+* Editing a file that doesn't exist yet now creates it instead of failing
+  with "does not exist". A model narrating `write_file`/`save_file` for
+  something new, or simply picking the edit tool over create for a
+  not-yet-created file, sends the same thing either way - the complete file
+  content, never a diff - so there was nothing an edit needed that a create
+  didn't already have
+* A narrated create/write intent ("I will create `X`") for a file that
+  doesn't exist yet was being reconstructed as a *read* of it instead,
+  which just fails and repeats the same narration until the nudge budget
+  ran out. Recovery now checks intent before assuming "mentioned a pending
+  path" means "read it"
+* A top-level file named with no directory (`main.py`, as opposed to
+  `src/main.py`) was invisible to the task plan, the pending-file tracker,
+  and the nudge - none of their path-matching required a directory, so a
+  request to create a root-level file could end with it silently never
+  created. Bare filenames with a recognized code/doc/config extension are
+  now matched too
+* A file that's both something to create *and* the thing that needs running
+  to confirm the task is done ("create `main.py` ... so it runs without
+  errors") had the "so it runs" half silently dropped, since a file already
+  counted as a change target was excluded from the verify-target list. That
+  removed the only thing nudging the model to ever actually run what it
+  just created, and let `task_complete` be accepted without the file having
+  been run at all. A file can now be both at once
+* `read_file`'s "file not found" message now suggests `create_new_file`
+  when nothing by that name exists anywhere in the workspace, instead of
+  only "use list/glob" - a model narrating "I'll create X" that natively
+  calls `read_file` first (seemingly to check whether it already exists)
+  gets pointed at the right next step instead of retrying the same read
+### Added
+* The eval harness (`manual-testing-sandbox/agent-eval`) can now drive a
+  real OpenAI-compatible server (`EVAL_BACKEND=openai`), not just a bare
+  Ollama or llama.cpp instance - needed for a multi-model proxy like
+  [llama-swap](https://github.com/mostlygeek/llama-swap), since it routes
+  on a `model` field the `llamacpp` backend never sent. `EVAL_TEMPERATURE`/
+  `EVAL_TOP_P` let a run match a specific model's own
+  `defaultCompletionOptions` instead of the harness's flat default
+* Two new eval scenarios alongside the existing bugfix fixture:
+  `manual-testing-sandbox/agent-eval-scaffold` (build a small project from
+  an empty workspace - nothing in the request exists yet) and
+  `manual-testing-sandbox/agent-eval-feature` (add a feature to a project
+  that already works - one new file plus a change to an existing one in the
+  same request, checked for regressions against the pre-existing behaviour
+  too). Both found real gaps the original bugfix-only fixture never
+  exercised, see each scenario's README
+
 ## 1.2.5 - 2026-09-29
 ### Fixed
 * The actual root cause of Gemma (and any other legacy-name-matching model)
